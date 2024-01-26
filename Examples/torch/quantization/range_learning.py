@@ -254,12 +254,14 @@ if __name__ == '__main__':
         description='Quantization aware training of pretrained ResNet18 model using range learning')
 
     parser.add_argument('--dataset_dir', type=str,
-                        required=True,
+                        default="/mnt/share_disk/cdd",
+                        # required=True,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
     parser.add_argument('--use_cuda', action='store_true',
-                        required=True,
+                        # required=True,
+                        default=True,
                         help='Add this flag to run the test on GPU.')
 
     parser.add_argument('--logdir', type=str,
