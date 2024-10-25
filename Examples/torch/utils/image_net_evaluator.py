@@ -43,7 +43,7 @@ import logging
 import progressbar
 import torch
 from torch import nn
-
+from Examples.common import image_net_config
 from Examples.common.utils import accuracy
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 
@@ -133,3 +133,11 @@ class ImageNetEvaluator:
                     acc_top1, acc_top5)
 
         return acc_top1
+
+
+if __name__ == "__main__":
+    evaluator = ImageNetEvaluator(
+        "/home/bruce_ultra/workspace/data_sets/mini-imagenet", 
+        image_size=image_net_config.dataset['image_size'],
+        batch_size=image_net_config.evaluation['batch_size'],
+        num_workers=image_net_config.evaluation['num_workers'])

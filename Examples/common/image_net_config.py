@@ -54,7 +54,7 @@ dataset = {
 
 evaluation = {
     "batch_size"        :       32,
-    "num_workers"       :       1
+    "num_workers"       :       4
 }
 
 train = {

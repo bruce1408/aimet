@@ -53,6 +53,7 @@ import torch.utils.data as torch_data
 # imports for AIMET
 import aimet_common
 from aimet_torch import bias_correction
+from printk import print_colored_box_line
 from aimet_torch.cross_layer_equalization import equalize_model
 from aimet_torch.v1.quantsim import QuantParams, QuantizationSimModel
 
@@ -221,6 +222,18 @@ def cle_bc_example(config: argparse.Namespace):
     if config.use_cuda:
         model.to(torch.device('cuda'))
     model = model.eval()
+    
+    # 对于 ImageNet，图像的标准大小是 (3, 224, 224)
+    input_tensor = torch.randn(1, 3, 224, 224)  # batch size = 1, RGB image of size 224x224
+    # 如果使用 CUDA，将输入张量也移动到 GPU 上
+    if torch.cuda.is_available():
+        input_tensor = input_tensor.to('cuda')
+
+    # 通过模型进行前向传播，获取输出
+    output = model(input_tensor)
+
+    # 打印输出的维度
+    print("Output shape:", output.shape)
 
     # Calculate FP32 accuracy
     accuracy = data_pipeline.evaluate(model, use_cuda=config.use_cuda)
@@ -258,13 +271,16 @@ if __name__ == '__main__':
                                                  'ResNet18 model and evaluate on ImageNet dataset')
 
     parser.add_argument('--dataset_dir', type=str,
-                        required=True,
+                        # required=True,
+                        default="/home/bruce_ultra/workspace/data_sets/mini-imagenet",
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
 
-    parser.add_argument('--use_cuda', action='store_true',
-                        required=True,
+    parser.add_argument('--use_cuda', 
+                        action='store_true',
+                        # required=True,
+                        default=True,
                         help='Add this flag to run the test on GPU.')
 
     parser.add_argument('--logdir', type=str,
