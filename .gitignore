@@ -39,3 +39,9 @@ packaging/setup_cfg.py
 
 # 忽略日志文件
 benchmark_output/
+
+SNPE/
+Genie/
+Makefile.*
+Android.*
+# examples/
