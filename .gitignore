@@ -30,6 +30,7 @@ unit_test_results
 
 # Other generated files
 *.swp
+*.tflite
 packaging/setup_cfg.py
 
 

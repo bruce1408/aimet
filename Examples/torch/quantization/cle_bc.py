@@ -55,7 +55,7 @@ import aimet_common
 from aimet_torch import bias_correction
 from printk import print_colored_box_line
 from aimet_torch.cross_layer_equalization import equalize_model
-from aimet_torch.v1.quantsim import QuantParams, QuantizationSimModel
+from aimet_torch.quantsim import QuantParams, QuantizationSimModel
 
 # imports for data pipelines
 from Examples.common import image_net_config
@@ -272,7 +272,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset_dir', type=str,
                         # required=True,
-                        default="/home/bruce_ultra/workspace/data_sets/mini-imagenet",
+                        default="/mnt/share/cdd/tiny-imagenet-200/",
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")

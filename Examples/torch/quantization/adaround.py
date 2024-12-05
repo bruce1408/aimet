@@ -47,15 +47,17 @@ import os
 from datetime import datetime
 from functools import partial
 from torchvision import models
+from torchvision.models import ResNet18_Weights
 import torch
 import torch.utils.data as torch_data
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "4, 5, 6, 7"
 # imports for AIMET
 import aimet_common
 from aimet_common.defs import QuantScheme
-from aimet_torch.v1.adaround.adaround_weight import Adaround, AdaroundParameters
+from aimet_torch.adaround.adaround_weight import Adaround, AdaroundParameters
 from aimet_torch.batch_norm_fold import fold_all_batch_norms
-from aimet_torch.v1.quantsim import QuantizationSimModel
+from aimet_torch.quantsim import QuantizationSimModel
 
 # imports for data pipelines
 from Examples.common import image_net_config
@@ -161,7 +163,8 @@ def apply_adaround_and_find_quantized_accuracy(model: torch.nn.Module, evaluator
 
     # Set and freeze parameter encodings. These encodings are associated with the Adarounded parameters.
     # This will make sure compute_encodings() doesn't alter the parameter encodings.
-    quantsim.set_and_freeze_param_encodings(encoding_path=os.path.join(logdir, 'adaround.encodings'))
+    # quantsim.set_and_freeze_param_encodings(encoding_path=os.path.join(logdir, 'adaround.encodings'))
+    quantsim.load_encodings(encoding_path=os.path.join(logdir, 'adaround.encodings'))
     quantsim.compute_encodings(forward_pass_callback=partial(evaluator, use_cuda=use_cuda),
                                forward_pass_callback_args=iterations)
     quantsim.export(path=logdir, filename_prefix='adaround_resnet', dummy_input=dummy_input.cpu())
@@ -194,7 +197,9 @@ def adaround_example(config: argparse.Namespace):
     data_pipeline = ImageNetDataPipeline(config)
 
     # Load the pretrained resnet18 model
-    model = models.resnet18(pretrained=True)
+    # model = models.resnet18(pretrained=True)
+    model = models.resnet18(weights=ResNet18_Weights.DEFAULT)
+
     if config.use_cuda:
         model.to(torch.device('cuda'))
     model = model.eval()
@@ -224,7 +229,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset_dir', type=str,
                         # required=True,
-                        default="/home/bruce_ultra/workspace/data_sets/mini-imagenet",
+                        default="/mnt/share/cdd/min_imagenet",
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
