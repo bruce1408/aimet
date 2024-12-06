@@ -54,6 +54,8 @@ import torch.utils.data as torch_data
 os.environ["CUDA_VISIBLE_DEVICES"] = "4, 5, 6, 7"
 # imports for AIMET
 import aimet_common
+aimet_common.SAVE_TO_YAML=True
+
 from aimet_common.defs import QuantScheme
 from aimet_torch.adaround.adaround_weight import Adaround, AdaroundParameters
 from aimet_torch.batch_norm_fold import fold_all_batch_norms
@@ -163,8 +165,8 @@ def apply_adaround_and_find_quantized_accuracy(model: torch.nn.Module, evaluator
 
     # Set and freeze parameter encodings. These encodings are associated with the Adarounded parameters.
     # This will make sure compute_encodings() doesn't alter the parameter encodings.
-    # quantsim.set_and_freeze_param_encodings(encoding_path=os.path.join(logdir, 'adaround.encodings'))
-    quantsim.load_encodings(encoding_path=os.path.join(logdir, 'adaround.encodings'))
+    quantsim.set_and_freeze_param_encodings(encoding_path=os.path.join(logdir, 'adaround.encodings'))
+    quantsim.load_encodings(encodings=os.path.join(logdir, 'adaround.encodings'))
     quantsim.compute_encodings(forward_pass_callback=partial(evaluator, use_cuda=use_cuda),
                                forward_pass_callback_args=iterations)
     quantsim.export(path=logdir, filename_prefix='adaround_resnet', dummy_input=dummy_input.cpu())
@@ -240,7 +242,8 @@ if __name__ == '__main__':
                         help='Add this flag to run the test on GPU.')
 
     parser.add_argument('--logdir', type=str,
-                        default=default_logdir,
+                        # default=default_logdir,
+                        default="/mnt/share_disk/bruce_trie/Quantizer-Tools/outputs/aimet_log/adaround_resnet18",
                         help="Path to a directory for logging.\
                               Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
 

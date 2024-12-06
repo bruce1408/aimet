@@ -47,6 +47,8 @@ import os
 from datetime import datetime
 from functools import partial
 from torchvision import models
+from torchvision.models import ResNet18_Weights
+
 import torch
 import torch.utils.data as torch_data
 
@@ -218,7 +220,9 @@ def cle_bc_example(config: argparse.Namespace):
     data_pipeline = ImageNetDataPipeline(config)
 
     # Load the pretrained resnet18 model
-    model = models.resnet18(pretrained=True)
+    # model = models.resnet18(pretrained=True)
+    model = models.resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+
     if config.use_cuda:
         model.to(torch.device('cuda'))
     model = model.eval()
@@ -272,7 +276,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset_dir', type=str,
                         # required=True,
-                        default="/mnt/share/cdd/tiny-imagenet-200/",
+                        default="/mnt/share/cdd/min_imagenet",
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
