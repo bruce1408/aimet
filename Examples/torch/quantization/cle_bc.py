@@ -43,7 +43,7 @@ and Bias Correction (BC) technique.
 
 import argparse
 import logging
-import os
+import os,time
 from datetime import datetime
 from functools import partial
 from torchvision import models
@@ -63,6 +63,11 @@ from aimet_torch.quantsim import QuantParams, QuantizationSimModel
 from Examples.common import image_net_config
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
+from Examples.torch.utils.aimet_config import *
+from quant_tools.common_utils import *
+from printk import print_colored_box_line, print_colored_box
+os.environ['CUDA_VISIBLE_DEVICES'] = cuda_ids
+
 
 logger = logging.getLogger('TorchCLE-BC')
 formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
@@ -195,7 +200,7 @@ def apply_bias_correction(model: torch.nn.Module, data_loader: torch_data.DataLo
     bias_correction.correct_bias(model.to(device="cuda"), params, num_quant_samples=num_quant_samples,
                                  data_loader=data_loader, num_bias_correct_samples=num_bias_correct_samples)
 
-
+@time_it
 def cle_bc_example(config: argparse.Namespace):
     """
     Example code that shows the following
@@ -269,6 +274,7 @@ def cle_bc_example(config: argparse.Namespace):
 
 
 if __name__ == '__main__':
+    
     default_logdir = os.path.join("benchmark_output", "CLE_BC" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
 
     parser = argparse.ArgumentParser(description='Apply Cross Layer Equalization and Bias Correction on pretrained '
@@ -276,14 +282,14 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset_dir', type=str,
                         # required=True,
-                        default="/mnt/share/cdd/min_imagenet",
+                        default=imagenet_dir,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
 
     parser.add_argument('--use_cuda', 
-                        action='store_true',
-                        # required=True,
+                        # action='store_true',
+                        type=bool,
                         default=True,
                         help='Add this flag to run the test on GPU.')
 
@@ -305,3 +311,4 @@ if __name__ == '__main__':
         raise RuntimeError("Found no CUDA Device while use_cuda is selected")
 
     cle_bc_example(_config)
+    

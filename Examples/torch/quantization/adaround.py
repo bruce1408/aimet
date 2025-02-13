@@ -44,18 +44,18 @@ import argparse
 import copy
 import logging
 import os
+import torch
 from datetime import datetime
 from functools import partial
 from torchvision import models
 from torchvision.models import ResNet18_Weights
-import torch
 import torch.utils.data as torch_data
+from Examples.torch.utils.aimet_config import *
+from quant_tools.common_utils import *
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "4, 5, 6, 7"
-# imports for AIMET
+os.environ["CUDA_VISIBLE_DEVICES"] = cuda_ids
 import aimet_common
 aimet_common.SAVE_TO_YAML=True
-
 from aimet_common.defs import QuantScheme
 from aimet_torch.adaround.adaround_weight import Adaround, AdaroundParameters
 from aimet_torch.batch_norm_fold import fold_all_batch_norms
@@ -174,7 +174,7 @@ def apply_adaround_and_find_quantized_accuracy(model: torch.nn.Module, evaluator
 
     return accuracy
 
-
+@time_it
 def adaround_example(config: argparse.Namespace):
     """
     1. Instantiates Data Pipeline for evaluation
@@ -229,21 +229,23 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Apply Adaround on pretrained ResNet18 model and evaluate on ImageNet dataset')
 
-    parser.add_argument('--dataset_dir', type=str,
+    parser.add_argument('--dataset_dir', 
+                        type=str,
                         # required=True,
-                        default="/mnt/share/cdd/min_imagenet",
+                        default=imagenet_dir,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
     parser.add_argument('--use_cuda', 
-                        action='store_true',
+                        # action='store_true',
                         # required=True,
+                        type=bool,
                         default=True,
                         help='Add this flag to run the test on GPU.')
 
     parser.add_argument('--logdir', type=str,
                         # default=default_logdir,
-                        default="/mnt/share_disk/bruce_trie/Quantizer-Tools/outputs/aimet_log/adaround_resnet18",
+                        default=f"{aimet_log_dir}/adaround_resnet18",
                         help="Path to a directory for logging.\
                               Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
 

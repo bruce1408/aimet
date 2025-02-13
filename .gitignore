@@ -46,3 +46,9 @@ Genie/
 Makefile.*
 Android.*
 # examples/
+
+aimet_config.py
+*.encodings
+*.onnx
+*.pth
+*.log

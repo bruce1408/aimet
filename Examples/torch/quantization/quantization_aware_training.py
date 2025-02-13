@@ -43,25 +43,33 @@ quantization aware training.
 
 import argparse
 import logging
-import os
+import os, time
 from datetime import datetime
 from functools import partial
 from typing import Tuple
 from torchvision import models
+from torchvision.models import ResNet18_Weights
+
 import torch
 import torch.utils.data as torch_data
+from printk import print_colored_box_line, print_colored_box
 
-# imports for AIMET
 import aimet_common
 from aimet_torch import bias_correction
 from aimet_torch.cross_layer_equalization import equalize_model
-from aimet_torch.v1.quantsim import QuantParams, QuantizationSimModel
+
+# from aimet_torch.v1.quantsim import QuantParams, QuantizationSimModel
+from aimet_torch.quantsim import QuantParams, QuantizationSimModel
 
 # imports for data pipelines
 from Examples.common import image_net_config
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_trainer import ImageNetTrainer
+from Examples.torch.utils.aimet_config import *
+from quant_tools.common_utils import *
+
+os.environ['CUDA_VISIBLE_DEVICES'] = cuda_ids
 
 logger = logging.getLogger('TorchQAT')
 formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
@@ -218,6 +226,7 @@ def calculate_quantsim_accuracy(model: torch.nn.Module, evaluator: aimet_common.
     return quantsim, accuracy
 
 
+@time_it
 def quantization_aware_training_example(config: argparse.Namespace):
     """
     1. Instantiates Data Pipeline for evaluation
@@ -241,7 +250,8 @@ def quantization_aware_training_example(config: argparse.Namespace):
     data_pipeline = ImageNetDataPipeline(config)
 
     # Load the pretrained resnet18 model
-    model = models.resnet18(pretrained=True)
+    model = models.resnet18(weights=ResNet18_Weights.DEFAULT)
+
     if config.use_cuda:
         model.to(torch.device('cuda'))
     model = model.eval()
@@ -294,17 +304,23 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Apply Quantization Aware Training (QAT) on pretrained ResNet18 model and evaluate on ImageNet dataset')
 
-    parser.add_argument('--dataset_dir', type=str,
-                        required=True,
+    parser.add_argument('--dataset_dir', 
+                        type=str,
+                        # required=True,
+                        default=imagenet_dir,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
-    parser.add_argument('--use_cuda', action='store_true',
-                        required=True,
+    parser.add_argument('--use_cuda', 
+                        # action='store_true',
+                        type=bool,
+                        default=True,
+                        # required=True,
                         help='Add this flag to run the test on GPU.')
 
-    parser.add_argument('--logdir', type=str,
-                        default=default_logdir,
+    parser.add_argument('--logdir', 
+                        type=str,
+                        default=f"{aimet_log_dir}/QAT_resnet18",
                         help="Path to a directory for logging.\
                               Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
 
@@ -335,3 +351,4 @@ if __name__ == '__main__':
         raise RuntimeError("Found no CUDA Device while use_cuda is selected")
 
     quantization_aware_training_example(_config)
+    
