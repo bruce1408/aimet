@@ -123,7 +123,7 @@ class ImageFolder(Dataset):
         Dataset.__init__(self)
         classes, class_to_idx = self._find_classes(root)
         self.samples = make_dataset(root, class_to_idx, IMG_EXTENSIONS, num_samples_per_class)
-        print("self.samples: ", self.samples)
+        # print("self.samples: ", self.samples)
         if not self.samples:
             raise (RuntimeError(
                 "Found 0 files in sub folders of: {}\nSupported extensions are: {}".format(

@@ -38,7 +38,7 @@
 """ Top level API for visualizing a pytorch model. """
 import os
 from typing import List
-import torch
+import torch, torchvision
 from bokeh import plotting
 from bokeh.layouts import column
 from aimet_torch import plotting_utils
@@ -158,3 +158,59 @@ def visualize_relative_weight_ranges_to_identify_problematic_layers(
 
     plotting.save(column(subplots))
     return subplots
+
+
+
+def visualize_model_weights(model_name: str = "resnet18", results_dir: str = None, pretrained: bool = True):
+    """
+    Load a model and visualize its weight distributions.
+    
+    :param model_name: Name of the model to load (e.g., 'resnet18', 'vgg16', 'densenet121')
+    :param results_dir: Directory to save the visualization results. If None, will create based on model name
+    :param pretrained: Whether to load pretrained weights
+    """
+    # Set default results directory if none provided
+    if results_dir is None:
+        results_dir = f"{model_name}_visualization_results"
+    
+    # Create results directory if it doesn't exist
+    os.makedirs(results_dir, exist_ok=True)
+    
+    # Load model
+    try:
+        model = getattr(torchvision.models, model_name)(pretrained=pretrained)
+        model.eval()
+    except AttributeError:
+        raise ValueError(f"Model {model_name} not found in torchvision.models")
+    
+    print(f"Loaded {model_name} model")
+    print("Generating weight range visualizations...")
+    
+    # Visualize weight ranges for all layers
+    visualize_weight_ranges(
+        model=model,
+        results_dir=results_dir
+    )
+    
+    print("Generating relative weight range visualizations...")
+    # Visualize relative weight ranges to identify potential problematic layers
+    visualize_relative_weight_ranges_to_identify_problematic_layers(
+        model=model,
+        results_dir=results_dir
+    )
+    
+    print(f"Visualization results have been saved to: {results_dir}")
+
+if __name__ == "__main__":
+    
+    # Example usage with different models
+    models_to_visualize = [
+        "resnet18"
+        # "vgg16",
+        # "densenet121",
+        # "mobilenet_v2"
+    ]
+    
+    for model_name in models_to_visualize:
+        print(f"\nVisualizing {model_name}...")
+        visualize_model_weights(model_name)

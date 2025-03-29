@@ -137,7 +137,7 @@ class ImageNetEvaluator:
 
 if __name__ == "__main__":
     evaluator = ImageNetEvaluator(
-        "/home/bruce_ultra/workspace/data_sets/mini-imagenet", 
+        "/mnt/share_disk/bruce_trie/outputs", 
         image_size=image_net_config.dataset['image_size'],
         batch_size=image_net_config.evaluation['batch_size'],
         num_workers=image_net_config.evaluation['num_workers'])

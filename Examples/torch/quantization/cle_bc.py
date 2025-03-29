@@ -51,11 +51,12 @@ from torchvision.models import ResNet18_Weights
 
 import torch
 import torch.utils.data as torch_data
+from spectrautils import logging_utils, print_utils, time_utils
+print_utils.print_colored_box("请在项目所在的 !根目录! 执行该脚本")
 
 # imports for AIMET
 import aimet_common
 from aimet_torch import bias_correction
-from printk import print_colored_box_line
 from aimet_torch.cross_layer_equalization import equalize_model
 from aimet_torch.quantsim import QuantParams, QuantizationSimModel
 
@@ -63,15 +64,16 @@ from aimet_torch.quantsim import QuantParams, QuantizationSimModel
 from Examples.common import image_net_config
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
-from Examples.torch.utils.aimet_config import *
-from quant_tools.common_utils import *
-from printk import print_colored_box_line, print_colored_box
-os.environ['CUDA_VISIBLE_DEVICES'] = cuda_ids
+from Examples.common import config_param
 
+os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
 
-logger = logging.getLogger('TorchCLE-BC')
-formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
-logging.basicConfig(format=formatter)
+logger_manager = logging_utils.AsyncLoggerManager(work_dir = config_param.aimet_log_dir, name_prefix="resnet18_torch")
+logger = logger_manager.logger
+
+# logger = logging.getLogger('TorchCLE-BC')
+# formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
+# logging.basicConfig(format=formatter)
 
 
 ###
@@ -149,9 +151,15 @@ def calculate_quantsim_accuracy(model: torch.nn.Module, evaluator: aimet_common.
     # compute encodings
     iterations = 5
 
-    quantsim = QuantizationSimModel(model=model, quant_scheme='tf_enhanced',
-                                    dummy_input=dummy_input, rounding_mode='nearest',
-                                    default_output_bw=8, default_param_bw=8, in_place=False)
+    quantsim = QuantizationSimModel(
+        model=model, 
+        quant_scheme='tf_enhanced',
+        dummy_input=dummy_input, 
+        rounding_mode='nearest',
+        default_output_bw=8, 
+        default_param_bw=8, 
+        in_place=False
+    )
 
     quantsim.compute_encodings(forward_pass_callback=partial(evaluator, use_cuda=use_cuda),
                                forward_pass_callback_args=iterations)
@@ -160,7 +168,7 @@ def calculate_quantsim_accuracy(model: torch.nn.Module, evaluator: aimet_common.
 
     return accuracy
 
-
+    
 def apply_cross_layer_equalization(model: torch.nn.Module, input_shape: tuple):
     """
     Applying CLE on the model inplace consists of:
@@ -200,7 +208,7 @@ def apply_bias_correction(model: torch.nn.Module, data_loader: torch_data.DataLo
     bias_correction.correct_bias(model.to(device="cuda"), params, num_quant_samples=num_quant_samples,
                                  data_loader=data_loader, num_bias_correct_samples=num_bias_correct_samples)
 
-@time_it
+@time_utils.time_it
 def cle_bc_example(config: argparse.Namespace):
     """
     Example code that shows the following
@@ -234,6 +242,7 @@ def cle_bc_example(config: argparse.Namespace):
     
     # 对于 ImageNet，图像的标准大小是 (3, 224, 224)
     input_tensor = torch.randn(1, 3, 224, 224)  # batch size = 1, RGB image of size 224x224
+    
     # 如果使用 CUDA，将输入张量也移动到 GPU 上
     if torch.cuda.is_available():
         input_tensor = input_tensor.to('cuda')
@@ -268,7 +277,7 @@ def cle_bc_example(config: argparse.Namespace):
     logger.info("Quantized (INT8) Model Top-1 Accuracy After Bias Correction = %.2f", accuracy)
 
     # Save the quantized model
-    torch.save(model, "resnet_model_cle_bc.pt")
+    torch.save(model, "/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet_model_cle_bc.pt")
 
     logger.info("Cross Layer Equalization (CLE) and Bias Correction (BC) complete")
 
@@ -280,9 +289,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Apply Cross Layer Equalization and Bias Correction on pretrained '
                                                  'ResNet18 model and evaluate on ImageNet dataset')
 
-    parser.add_argument('--dataset_dir', type=str,
+    parser.add_argument('--dataset_dir', 
+                        type=str,
                         # required=True,
-                        default=imagenet_dir,
+                        default=config_param.imagenet_dir,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
@@ -300,11 +310,12 @@ if __name__ == '__main__':
 
     _config = parser.parse_args()
 
-    os.makedirs(_config.logdir, exist_ok=True)
+    # os.makedirs(_config.logdir, exist_ok=True)
 
-    fileHandler = logging.FileHandler(os.path.join(_config.logdir, "test.log"))
-    fileHandler.setFormatter(formatter)
-    logger.addHandler(fileHandler)
+    # fileHandler = logging.FileHandler(os.path.join(_config.logdir, "test.log"))
+    # formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
+    # fileHandler.setFormatter(formatter)
+    # logger.addHandler(fileHandler)
 
     if _config.use_cuda and not torch.cuda.is_available():
         logger.error('use_cuda is selected but no cuda device found.')
