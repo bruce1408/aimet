@@ -36,3 +36,11 @@ package_info.py
 
 # Models
 *.onnx
+*.pth
+
+# 输出
+**benchmark_output/
+
+**examples_pro/
+
+**output_log/
