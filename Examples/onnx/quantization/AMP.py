@@ -1,21 +1,19 @@
 
 # # Automatic Mixed-Precision (AMP)
-# 
-# This notebook shows a working code example of how to use AIMET to perform Auto Mixed Precision (AMP). AMP is a technique where given a quantized accuracy target, AIMET finds bit-precision per-layer to meet that accuracy target while trying to optimize the model for inference speed.
-# 
-# As an example, say a particular model is not meeting a desired accuracy target when run in INT8. The Auto Mixed Precision feature will find a minimal set of layers that need to run on say INT16 to get to the desired accuracy. It should be noted that choosing higher precision for some layers necessarily involves a trade-off: lower inferences/sec for higher accuracy and vice-versa.
-# 
-# Alternatively, the AMP feature can be used to generate a pareto curve (accuracy vs. bit-ops) that can guide the user to decide the right operating point for this tradeoff.
-# 
-# This notebook specifically shows working code example for the above. 
+
+# 这个笔记本展示了如何使用AIMET执行自动混合精度（AMP）的工作代码示例。AMP是一种技术，给定量化精度目标，
+# AIMET会为每一层找到合适的位精度，以满足精度目标，同时优化模型的推理速度。
+# 例如，假设某个模型在INT8下无法达到所需的精度目标。自动混合精度功能将找到最少的一组需要在INT16下运行的层，
+# 以达到所需的精度。需要注意的是，为某些层选择更高的精度必然涉及权衡：更低的推理速度换取更高的精度，反之亦然。
+# 另外，AMP功能可以用来生成帕累托曲线（精度vs.位操作），指导用户决定这种权衡的最佳操作点。
 # 
 # #### Overall flow
-# This notebook covers the following
-# 1. Instantiate the example evaluation pipeline
-# 2. Convert an FP32 PyTorch model to ONNX and evaluate the model's baseline FP32 accuracy
-# 3. Create a quantization simulation model (with fake quantization ops inserted)
-# 4. Run AMP algorithm on the quantized model 
-# 
+# 1. AMP是一种自动调整模型各层量化精度的技术。
+# 2. 它在保证模型精度的同时，尽量优化推理速度。
+# 3. AMP可以帮助解决全INT8量化无法满足精度要求的问题。
+# 4. 它提供了精度和推理速度之间的权衡选择。
+# 5. 通过生成帕累托曲线，帮助用户选择最佳的操作点。
+
 # #### What this notebook is not
 # * This notebook is not designed to show state-of-the-art AMP results. For example, it uses a relatively quantization-friendly model like Resnet18. Also, some optimization parameters like number of samples for evaluation are deliberately chosen to have the notebook execute more quickly.
 
@@ -34,7 +32,7 @@
 # Edit the cell below and specify the directory where the downloaded ImageNet dataset is saved.
 
 
-DATASET_DIR = '/path/to/dataset'         # Please replace this with a real directory
+# DATASET_DIR = '/path/to/dataset'         # Please replace this with a real directory
 DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'         
 
 
@@ -47,11 +45,12 @@ DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'
 # 
 
 
-import torch
+import torch,os
 import onnxruntime as ort
 from Examples.common import image_net_config
 from Examples.onnx.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
+os.environ["CUDA_VISIBLE_DEVICES"]="7"
 
 class ImageNetDataPipeline:
 
@@ -68,7 +67,7 @@ class ImageNetDataPipeline:
         return data_loader
 
     @staticmethod
-    def evaluate(sess: ort.InferenceSession) -> float:
+    def evaluate(sess: ort.InferenceSession, args=None) -> float:
         """
         Given a torch model, evaluates its Top-1 accuracy on the dataset
         :param sess: the model to evaluate
@@ -88,9 +87,8 @@ class ImageNetDataPipeline:
 
 # For this example notebook, we are going to load a pretrained resnet18 model from torchvision. Similarly, you can load any pretrained PyTorch model instead.
 
-
-from torchvision.models import resnet18
 import onnx
+from torchvision.models import resnet18, ResNet18_Weights
 
 input_shape = (1, 3, 224, 224)    # Shape for each ImageNet sample is (3 channels) x (224 height) x (224 width)
 dummy_input = torch.randn(input_shape)
@@ -98,7 +96,7 @@ dummy_input = torch.randn(input_shape)
 filename = "/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18_origin.onnx"
 
 # Load a pretrained ResNet-18 model in torch
-pt_model = resnet18(pretrained=True)
+pt_model = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
 
 # Export the torch model to onnx
 torch.onnx.export(pt_model.eval(),
@@ -223,8 +221,9 @@ def pass_calibration_data(session, samples):
 # Now we call AIMET to use the above routine to pass data through the model and then subsequently compute the quantization encodings. Encodings here refer to scale/offset quantization parameters.
 
 
+# Use 10000 samples for computing initial scale/offset
 sim.compute_encodings(forward_pass_callback=pass_calibration_data,
-                      forward_pass_callback_args=1000) # Use 10000 samples for computing initial scale/offset
+                      forward_pass_callback_args=1000) 
 
 accuracy = ImageNetDataPipeline.evaluate(sim.session)
 print(accuracy)
@@ -327,6 +326,13 @@ amp_search_algo = AMPSearchAlgo.Binary
 
 from aimet_onnx.mixed_precision import choose_mixed_precision
 
+# 使用一个简化的评估函数来加速Phase 1
+def evaluate_model_phase1(session, num_samples=1000):
+    return ImageNetDataPipeline.evaluate(session, num_samples)
+
+eval_callback_for_phase1 = CallbackFunc(evaluate_model_phase1, func_callback_args=1000)
+
+
 pareto_front_list = choose_mixed_precision(sim, candidates,
                                            eval_callback_for_phase1=eval_callback_for_phase1, 
                                            eval_callback_for_phase2=eval_callback_for_phase2, 
@@ -343,8 +349,8 @@ pareto_front_list = choose_mixed_precision(sim, candidates,
 
 
 import os
-os.makedirs('./output/', exist_ok=True)
-sim.export(path='./output/', filename_prefix='resnet18_mixed_precision')
+os.makedirs('/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18_amp', exist_ok=True)
+sim.export(path='/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18_amp', filename_prefix='resnet18_mixed_precision')
 
 
 # ---
