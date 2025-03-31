@@ -1,22 +1,20 @@
 
-# # Adaptive Rounding (AdaRound)
-# This notebook contains a working example of AIMET adaptive rounding (AdaRound).
+# # Quantization simulation
 # 
-# AIMET quantization features typically use the "nearest rounding" technique for achieving quantization.
-# When using the nearest rounding technique, the weight value is quantized to the nearest integer value.
+# This notebook contains a working example of AIMET Quantization simulation. 
+# QAT is an AIMET feature that adds quantization simulation operations (also called fake quantization ops) to a trained ML model. 
+# A standard training pipeline is then used to train or fine-tune the model. 
+# The resulting model should show improved accuracy on quantized ML accelerators.
 # 
-# AdaRound optimizes a loss function using unlabeled training data to decide whether to quantize a specific weight to the closer integer value or the farther one.
-# Using AdaRound, quantized accuracy is closer to the FP32 model than with nearest rounding.
+# The quantization parameters (like encoding min/max, scale, and offset) for activations are computed once. During fine-tuning, the model weights are updated to minimize the effects of quantization in the forward pass, keeping the quantization parameters constant.
 # 
 # ## Overall flow
 # 
 # The example follows these high-level steps:
 # 
-# 1. Instantiate the example evaluation and training pipeline
-# 2. Load the FP32 model and evaluate the model to find the baseline FP32 accuracy
-# 3. Create a quantization simulation model (with fake quantization ops) and evaluate the quantized simuation model
-# 4. Apply AdaRound and evaluate the simulation model to get a post-finetuned quantized accuracy score
-# 
+# 1. Instantiate the example evaluation pipeline
+# 2. Convert an FP32 PyTorch model to ONNX and evaluate the model's baseline FP32 accuracy
+# 3. Create a quantization simulation model (with fake quantization ops inserted) and evaluate this simulation model to get a quantized accuracy score.
 # 
 # <div class="alert alert-info">
 # 
@@ -55,17 +53,9 @@
 # Edit the cell below to specify the directory where the downloaded ImageNet dataset is saved.
 
 
-DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'         # Replace this path with a real directory
-
-import sys
-from spectrautils.onnx_utils import visualize_onnx_model_weights
-
-adaround_path = "/mnt/share_disk/bruce_trie/workspace/logs_aimet/adaround_output/resnet18_after_adaround.onnx"
-
-visualize_onnx_model_weights(adaround_path, model_name="resnet18_adaround", results_dir="/mnt/share_disk/bruce_trie/workspace/logs_aimet/adaround_output")
+DATASET_DIR = '/path/to/dataset/'         # Please replace this with a real directory
 
 
-sys.exit(0)  # 这会完全退出Python解释器
 # ---
 # 
 # ## 1. Instantiate the example training and validation pipeline
@@ -79,12 +69,11 @@ sys.exit(0)  # 这会完全退出Python解释器
 # 
 
 
-import torch,os
+import torch
 import onnxruntime as ort
 from Examples.common import image_net_config
 from Examples.onnx.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
-os.environ["CUDA_VISIBLE_DEVICES"]="7"
 
 class ImageNetDataPipeline:
 
@@ -113,7 +102,9 @@ class ImageNetDataPipeline:
         return evaluator.evaluate(sess, iterations=None)
 
 
+
 # ---
+# 
 # ## 2. Convert an FP32 PyTorch model to ONNX, simplify & then evaluate baseline FP32 accuracy
 
 
@@ -127,8 +118,7 @@ import onnx
 
 input_shape = (1, 3, 224, 224)    # Shape for each ImageNet sample is (3 channels) x (224 height) x (224 width)
 dummy_input = torch.randn(input_shape)
-# filename = "./resnet18.onnx"
-filename = "/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18_origin.onnx"
+filename = "./resnet18.onnx"
 
 # Load a pretrained ResNet-18 model in torch
 pt_model = resnet18(pretrained=True)
@@ -137,8 +127,9 @@ pt_model = resnet18(pretrained=True)
 torch.onnx.export(pt_model.eval(),
                   dummy_input,
                   filename,
+                  training=torch.onnx.TrainingMode.EVAL,
                   export_params=True,
-                  do_constant_folding=True,
+                  do_constant_folding=False,
                   input_names=['input'],
                   output_names=['output'],
                   dynamic_axes={
@@ -198,7 +189,7 @@ print(accuracy)
 # 
 # BN folding improves inference performance on quantized runtimes but can degrade accuracy on these platforms. This step simulates this on-target drop in accuracy. 
 # 
-# **3.1 Use the following code to call AIMET to fold the BN layers in-place on the given model.**
+# **3.1 Use the following code to call AIMET to fold the BN layers in-place on the model.**
 
 
 from aimet_onnx.batch_norm_fold import fold_all_batch_norms_to_weight
@@ -220,11 +211,10 @@ _ = fold_all_batch_norms_to_weight(model)
 # See [QuantizationSimModel in the AIMET API documentation](https://quic.github.io/aimet-pages/AimetDocs/api_docs/torch_quantsim.html#aimet_torch.quantsim.QuantizationSimModel.compute_encodings) for a full explanation of the parameters.
 
 
-import copy
 from aimet_common.defs import QuantScheme
 from aimet_onnx.quantsim import QuantizationSimModel
 
-sim = QuantizationSimModel(model=copy.deepcopy(model),
+sim = QuantizationSimModel(model=model,
                            quant_scheme=QuantScheme.post_training_tf_enhanced,
                            default_activation_bw=8,
                            default_param_bw=8,
@@ -262,7 +252,7 @@ def pass_calibration_data(session, samples):
 # 
 # ---
 # 
-# **3.4 Call AIMET to use the routine to pass data through the model and compute the quantization encodings.** 
+# **3.4 Call AIMET to pass data through the model and compute the quantization encodings.** 
 # 
 # Encodings here refer to scale and offset quantization parameters.
 
@@ -282,115 +272,10 @@ accuracy = ImageNetDataPipeline.evaluate(sim.session)
 print(accuracy)
 
 
-# ---
-# ## 4. Apply Adaround
-# 
-# **4.1 Use the code below to apply Adaround to the original model.**
-# 
-# Some key parameters:
-# 
-# - **dataloader:**  is a training or validation dataloader. Adaround needs a dataloader in order to use data samples to learn the rounding vectors.
-# - **num_batches:** is the number of batches used while calculating the quantization encodings. A typical value for Adaround is 2000 samples. To speed up the execution this example uses a batch size of one.
-# - **default_num_iterations:** is the number of iterations to apply to each layer. Default value is 10000, and we strongly recommend using at least this number. This example uses 32 to speed up execution.
-
-
-import os
-from aimet_onnx.adaround.adaround_weight import Adaround, AdaroundParameters
-
-# Dataloader satisfying the class signature required by AdaRound
-class DataLoader:
-    """
-    This dataloader derives unlabeled samples in the form of numpy arrays from a torch dataloader
-    """
-    def __init__(self):
-        self._torch_data_loader = ImageNetDataPipeline.get_val_dataloader()
-        self._iterator = None
-        self.batch_size = self._torch_data_loader.batch_size
-
-    def __iter__(self):
-        self._iterator = iter(self._torch_data_loader)
-        return self
-
-    def __next__(self):
-        input_data, _ = next(self._iterator)
-        return input_data.numpy()
-
-    def __len__(self):
-        return len(self._torch_data_loader)
-
-data_loader = DataLoader()
-params = AdaroundParameters(data_loader=data_loader, num_batches=1, default_num_iterations=32, 
-                            forward_fn=pass_calibration_data, forward_pass_callback_args=1000)
-
-output_path = '/mnt/share_disk/bruce_trie/workspace/logs_aimet/adaround_output/' 
-os.makedirs(output_path, exist_ok=True)
-ada_model = Adaround.apply_adaround(model, params,
-                                    path=output_path, 
-                                    filename_prefix='adaround', 
-                                    default_param_bw=8,
-                                    default_quant_scheme=QuantScheme.post_training_tf_enhanced)
-
-
-# ---
-# **4.2 Quantize the Adarounded model.** 
-# 
-# <div class="alert alert-info">
-# 
-# Note
-# 
-# Two important points about the following code:
-# 
-# </div>
-# 
-# - **Parameter Biwidth Precision**: The QuantizationSimModel must be created with the same parameter bitwidth precision that was used in `apply_adaround()`.
-#     
-# - **Freezing the parameter encodings**:
-# After creating the QuantizationSimModel, you must call `set_and_freeze_param_encodings()` before calling `compute_encodings()`.
-# During AdaRound, the parameters are rounded based on these initial internally created encodings.
-# To maintain accuracy, it is important to freeze these encodings so that the call to `compute_encodings()` does not alter the parameter encodings negate the AdaRounded accuracy.
-
-
-sim = QuantizationSimModel(model=ada_model,
-                           quant_scheme=QuantScheme.post_training_tf_enhanced,
-                           default_activation_bw=8,
-                           default_param_bw=8,
-                           use_cuda=use_cuda)
-
-sim.set_and_freeze_param_encodings(encoding_path=os.path.join(output_path, 'adaround.encodings'))
-
-sim.compute_encodings(forward_pass_callback=pass_calibration_data,
-                      forward_pass_callback_args=1000)
-
-
-# **4.3 Compute the accuracy of the Adarounded model.** 
-# 
-# Evaluate the simulation model as before to determine simulated quantized accuracy.
-
-
-accuracy = ImageNetDataPipeline.evaluate(sim.session)
-print(accuracy)
-
-
-# ---
-# There might be little gain in accuracy after this limited application of Adaround. Experiment with the hyper-parameters to get better results.
-# 
-# ## Next steps
-# 
-# **Export the model and encodings.**
-# 
-# - Export the model with the updated weights but without the fake quant ops. 
-# - Export the encodings (scale and offset quantization parameters). AIMET QuantizationSimModel provides an export API for this purpose.
-# 
-# The following code performs these exports.
-
-
-sim.export(path=output_path, filename_prefix='resnet18_after_adaround')
-
-
 # ## For more information
 # 
 # See the [AIMET API docs](https://quic.github.io/aimet-pages/AimetDocs/api_docs/index.html) for details about the AIMET APIs and optional parameters.
 # 
-# See the [other example notebooks](https://github.com/quic/aimet/tree/develop/Examples/torch/quantization) to learn how to use other AIMET post-training quantization techniques.
+# See the [other example notebooks](https://github.com/quic/aimet/tree/develop/Examples/torch/quantization) to learn how to use QAT with range-learning and other AIMET post-training quantization techniques.
 
 

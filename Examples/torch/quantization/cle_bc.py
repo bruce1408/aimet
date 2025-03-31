@@ -52,6 +52,7 @@ from torchvision.models import ResNet18_Weights
 import torch
 import torch.utils.data as torch_data
 from spectrautils import logging_utils, print_utils, time_utils
+from spectrautils.onnx_utils import visualize_torch_model_weights
 print_utils.print_colored_box("请在项目所在的 !根目录! 执行该脚本")
 
 # imports for AIMET
@@ -235,11 +236,12 @@ def cle_bc_example(config: argparse.Namespace):
     # Load the pretrained resnet18 model
     # model = models.resnet18(pretrained=True)
     model = models.resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
-
+    
     if config.use_cuda:
         model.to(torch.device('cuda'))
     model = model.eval()
-    
+    visualize_torch_model_weights(model, "resnet18_official", "/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18_official_weight_analysis")
+
     # 对于 ImageNet，图像的标准大小是 (3, 224, 224)
     input_tensor = torch.randn(1, 3, 224, 224)  # batch size = 1, RGB image of size 224x224
     
@@ -279,7 +281,11 @@ def cle_bc_example(config: argparse.Namespace):
     # Save the quantized model
     torch.save(model, "/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet_model_cle_bc.pt")
 
+    visualize_torch_model_weights(model, "resnet18_cle_bc", "/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18_cle_bc_weight_analysis")
+    
     logger.info("Cross Layer Equalization (CLE) and Bias Correction (BC) complete")
+    
+    
 
 
 if __name__ == '__main__':
