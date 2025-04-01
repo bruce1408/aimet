@@ -97,7 +97,6 @@ class LitImageNet(LightningModule):
         """
         Model forward pass
         """
-        # x = x.detach().clone().requires_grad_(True)
         
         # 确保输入张量支持梯度计算
         if not x.requires_grad:
@@ -147,12 +146,22 @@ class LitImageNet(LightningModule):
     
     def on_validation_epoch_end(self):
         """ Runs at the end of validation step to print accuracy """
-        val_accuracy = self.accuracy.compute()
-        if self.trainer.is_global_zero:
-            print_utils.print_colored_box("\nVALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
+        # val_accuracy = self.accuracy.compute()
+        # if self.trainer.is_global_zero:
+        #     print_utils.print_colored_box("\nVALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
             
-        #Resetting accuracy is not mandatory in more latest releases.
-        self.accuracy.reset()
+        # #Resetting accuracy is not mandatory in more latest releases.
+        # self.accuracy.reset()
+        
+        if self.accuracy._update_called:  # 检查是否已经调用了update
+            val_accuracy = self.accuracy.compute()
+            if self.trainer.is_global_zero:
+                print_utils.print_colored_box("\nVALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
+            self.accuracy.reset()
+        else:
+            logger.warning("Accuracy metric was not updated during validation")
+
+            
         
 
     def test_step(self, batch, batch_idx):
@@ -242,7 +251,10 @@ def main():
         accelerator='gpu',
         devices=-1,# -1 means all available GPUs
         max_epochs=args.epochs,
-        limit_train_batches=10
+        limit_train_batches=10,
+        log_every_n_steps=5,  # 将日志间隔设置为更小的值
+        inference_mode= False
+
     )
 
     # STEP 2
