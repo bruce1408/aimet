@@ -213,22 +213,56 @@ RUN python3 -m pip --no-cache-dir install \
     python3 -m ipykernel.kernelspec
 
 # Onnxruntime C/C++ package needed to create custom C++ onnx ops for quantsim
-RUN mkdir /opt/onnxruntime && \
-    export ONNXRUNTIME_VER=$(python3 -c 'import onnxruntime; print(onnxruntime.__version__)') && \
-    wget -qO- "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VER}/onnxruntime-linux-x64-gpu-${ONNXRUNTIME_VER}.tgz" | tar xvz --strip-components 1 -C /opt/onnxruntime && \
-    ln -s /opt/onnxruntime /usr/local/bin/onnxruntime_headers
+COPY onnxruntime-linux-x64-gpu-1.18.1.tgz /tmp/
+
+RUN mkdir -p /opt/onnxruntime && \
+    cd /tmp && \
+    tar xf onnxruntime-linux-x64-gpu-1.18.1.tgz --strip-components 1 -C /opt/onnxruntime && \
+    rm onnxruntime-linux-x64-gpu-1.18.1.tgz && \
+    ln -sf /opt/onnxruntime /usr/local/bin/onnxruntime_headers
+
+# RUN mkdir -p /opt/onnxruntime && \
+#     export ONNXRUNTIME_VER=1.18.1 && \
+#     cd /tmp && \
+#     wget "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VER}/onnxruntime-linux-x64-gpu-${ONNXRUNTIME_VER}.tgz" && \
+#     tar xf onnxruntime-linux-x64-gpu-${ONNXRUNTIME_VER}.tgz --strip-components 1 -C /opt/onnxruntime && \
+#     rm onnxruntime-linux-x64-gpu-${ONNXRUNTIME_VER}.tgz && \
+#     ln -sf /opt/onnxruntime /usr/local/bin/onnxruntime_headers
 
 ENV PATH=/usr/local/bin:$PATH
 
 # Opencv
+COPY opencv-3.4.19.tar.gz /tmp/
+RUN cd /tmp && \
+    tar xf opencv-3.4.19.tar.gz && \
+    cd opencv-3.4.19 && \
+    mkdir release && \
+    cd release && \
+    cmake \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_BUILD_TYPE=release \
+        -DWITH_FFMPEG=OFF \
+        -DBUILD_TESTS=OFF \
+        -DWITH_CUDA=OFF \
+        -DBUILD_PERF_TESTS=OFF \
+        -DWITH_IPP=OFF \
+        -DENABLE_PRECOMPILED_HEADERS=OFF \
+        -DWITH_ITT=OFF \
+        .. && \
+    make -j$(nproc) && \
+    make install && \
+    cd /tmp && \
+    rm -rf opencv-3.4.19* 3.4.19.tar.gz
+
 # Ref: https://docs.opencv.org/3.4.19/d7/d9f/tutorial_linux_install.html
-RUN wget -q https://github.com/opencv/opencv/archive/refs/tags/3.4.19.tar.gz -O /tmp/3.4.19.tar.gz > /dev/null && \
-    tar -C /tmp -xvf /tmp/3.4.19.tar.gz > /dev/null && \
-    cd /tmp/opencv-3.4.19 && mkdir release && cd release && \
-    cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=release -DWITH_FFMPEG=OFF -DBUILD_TESTS=OFF -DWITH_CUDA=OFF -DBUILD_PERF_TESTS=OFF -DWITH_IPP=OFF -DENABLE_PRECOMPILED_HEADERS=OFF -DWITH_ITT=OFF .. > /dev/null && \
-    make -j16 > /dev/null && \
-    make -j16 install > /dev/null && \
-    rm -rf /tmp/opencv-3.4.19*
+# RUN wget -q https://github.com/opencv/opencv/archive/refs/tags/3.4.19.tar.gz -O /tmp/3.4.19.tar.gz > /dev/null && \
+#     tar -C /tmp -xvf /tmp/3.4.19.tar.gz > /dev/null && \
+#     cd /tmp/opencv-3.4.19 && mkdir release && cd release && \
+#     cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=release -DWITH_FFMPEG=OFF -DBUILD_TESTS=OFF -DWITH_CUDA=OFF -DBUILD_PERF_TESTS=OFF -DWITH_IPP=OFF -DENABLE_PRECOMPILED_HEADERS=OFF -DWITH_ITT=OFF .. > /dev/null && \
+#     make -j16 > /dev/null && \
+#     make -j16 install > /dev/null && \
+#     rm -rf /tmp/opencv-3.4.19*
 
 EXPOSE 25000
 RUN apt-get update && apt-get install -y openssh-server && rm -rf /var/lib/apt/lists/*
@@ -277,8 +311,15 @@ RUN ln -s /usr/bin/run-clang-tidy-11.py /usr/bin/run-clang-tidy.py
 RUN chmod o+w /usr/local/lib/python3.10/dist-packages
 
 # Install cutlass 3.3.0
+# RUN cd /usr/local && \
+#     git clone --depth 1 --branch v3.3.0 https://github.com/NVIDIA/cutlass.git && \
+#     mv cutlass cutlass-3.3.0 && \
+#     chown -R root:users cutlass-3.3.0 && \
+#     ln -s cutlass-3.3.0 cutlass
+
+COPY cutlass /usr/local/cutlass
+
 RUN cd /usr/local && \
-    git clone --depth 1 --branch v3.3.0 https://github.com/NVIDIA/cutlass.git && \
     mv cutlass cutlass-3.3.0 && \
     chown -R root:users cutlass-3.3.0 && \
     ln -s cutlass-3.3.0 cutlass
