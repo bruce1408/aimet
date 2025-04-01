@@ -62,7 +62,15 @@ from pytorch_lightning import LightningModule
 from torchmetrics import Accuracy
 
 from aimet_torch import quantsim
+from spectrautils import logging_utils, print_utils
+from Examples.common import config_param
+os.environ["CUDA_VISIBLE_DEVICES"]=config_param.cuda_ids
 
+# 添加这行代码来设置 matmul 精度
+torch.set_float32_matmul_precision('high')
+
+logger_manager = logging_utils.AsyncLoggerManager(work_dir=config_param.aimet_log_dir, name_prefix="qat_lighting_resnet18")
+logger = logger_manager.logger
 #=======================define module==========================#
 class LitImageNet(LightningModule):
     """
@@ -81,12 +89,19 @@ class LitImageNet(LightningModule):
         file_path = model_path
         quant_sim = quantsim.load_checkpoint(file_path)
         self.model = quant_sim.model
-        self.accuracy = Accuracy()
+        # self.accuracy = Accuracy()
+        self.accuracy = Accuracy(task="multiclass", num_classes=self.num_classes)
+
 
     def forward(self, x):
         """
         Model forward pass
         """
+        # x = x.detach().clone().requires_grad_(True)
+        
+        # 确保输入张量支持梯度计算
+        if not x.requires_grad:
+            x = x.clone().detach().requires_grad_(True)
         x = self.model(x)
         return x
 
@@ -94,6 +109,12 @@ class LitImageNet(LightningModule):
         """ Training  step """
         #Notice that no optimizer.step, torch.no_grad. model.eval is required
         images, labels = batch
+        # images = images.clone().detach().requires_grad_(True)
+        
+        # 确保输入张量支持梯度计算
+        if not images.requires_grad:
+            images = images.clone().detach().requires_grad_(True)
+            
         logits = self.model(images)
         loss = F.cross_entropy(logits, labels)
         return loss
@@ -101,6 +122,9 @@ class LitImageNet(LightningModule):
     def validation_step(self, batch, _):
         """ Validation step used b lightning """
         images, labels = batch
+        
+        # 确保验证时也正确处理张量
+        images = images.detach().clone()
         logits = self.model(images)
         loss = F.cross_entropy(logits, labels)
         pred = torch.argmax(logits, dim=1)
@@ -111,16 +135,25 @@ class LitImageNet(LightningModule):
         self.log("val_acc", self.accuracy, on_epoch=True, on_step=False, prog_bar=True)
         return loss
 
-    def validation_epoch_end(self, _):
+    # def validation_epoch_end(self, _):
+    #     """ Runs at the end of validation step to print accuracy """
+    #     val_accuracy = self.accuracy.compute()
+    #     if self.trainer.is_global_zero:
+    #         print_utils.print_colored_box("\nVALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
+            
+    #     #Resetting accuracy is not mandatory in more latest releases.
+    #     self.accuracy.reset()
+
+    
+    def on_validation_epoch_end(self):
         """ Runs at the end of validation step to print accuracy """
         val_accuracy = self.accuracy.compute()
         if self.trainer.is_global_zero:
-            print("\n------------------------------------------------------------")
-            print("\nVALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
-            print("\n------------------------------------------------------------")
-
+            print_utils.print_colored_box("\nVALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
+            
         #Resetting accuracy is not mandatory in more latest releases.
         self.accuracy.reset()
+        
 
     def test_step(self, batch, batch_idx):
         """ Runs validation """
@@ -173,23 +206,22 @@ def main():
     """ Main function """
     # STEP 1
     parser = argparse.ArgumentParser(description='PyTorch Lightning DDP')
-    parser.add_argument('--epochs', default=1, type=int, metavar='N',
-                        help='number of total epochs to run')
+    parser.add_argument('--epochs', default=1, type=int, metavar='N', help='number of total epochs to run')
     parser.add_argument('-b', '--batch_size', default=128, type=int,
                         metavar='N')
     parser.add_argument('--learning_rate', default=0.000001, type=float,
                         help='initial learning rate')
     parser.add_argument('--num_classes', default=1000, type=int,
                         help='Number of classes for the network.')
-    parser.add_argument('--model_path',
-                        help="path to the quantized model's saved checkpoint for QAT", default='na')
-    parser.add_argument('--imagenet_dir',
-                        help="path to imagenet_dir", required=True)
+    parser.add_argument('--model_path', 
+                        help="path to the quantized model's saved checkpoint for QAT", 
+                        default='/mnt/share_disk/bruce_trie/workspace/logs_aimet/mobilenet_v2_qat.pth'
+                    )
+    parser.add_argument('--imagenet_dir', default=config_param.imagenet_dir, help="path to imagenet_dir", )
+    
     args = parser.parse_args()
 
-    print("TRAINING QUANTIZED MODEL ON DDP ...")
-    print("================================================"+str(args.batch_size))
-    print("================================================"+str(torch.cuda.device_count()))
+    print_utils.print_colored_box("TRAINING QUANTIZED MODEL ON DDP ...")
 
     #For full deterministic reproducible behavior set seed_everything and have deterministic flag to True in trainer function
     pl.seed_everything(0, workers=True)

@@ -35,3 +35,4 @@ packaging/setup_cfg.py
 **benchmark_output/
 **output_log/
 **examples_pro/
+**lightning_logs/

@@ -68,6 +68,15 @@ from aimet_torch.quantsim import QuantizationSimModel
 from aimet_torch import quantsim
 from aimet_torch import batch_norm_fold
 from aimet_torch.model_preparer import prepare_model
+from Examples.common import config_param
+from Examples.common import image_net_config
+
+from spectrautils import logging_utils, print_utils
+
+logger_manager = logging_utils.AsyncLoggerManager(work_dir=config_param.aimet_log_dir, name_prefix="qat_mobilenet_v2")
+logger = logger_manager.logger
+
+os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
 
 
 def find_free_network_port() -> int:
@@ -162,8 +171,10 @@ def evaluate_ddp(rank, world_size, port_id, model, imagenet_dir, batch_size, res
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
     # Initializations
-    metric = torchmetrics.Accuracy()
-    num_workers = 1
+    # metric = torchmetrics.Accuracy()
+    metric = torchmetrics.Accuracy(task="multiclass", num_classes=1000)  # ImageNet有1000个类别
+
+    num_workers = 8
 
     # Get validation data
     val_dir = os.path.join(imagenet_dir, 'val')
@@ -208,12 +219,12 @@ def evaluate_ddp(rank, world_size, port_id, model, imagenet_dir, batch_size, res
 
             print_freq = 10
             if rank in [0, 1] and i % print_freq == 0:  # print only for rank 0
-                print(f"Accuracy on batch {i}: {acc} - rank {rank}")
+                logger.info(f"Accuracy on batch {i}: {acc} - rank {rank}")
 
         # metric on all batches and all accelerators using custom accumulation
         # accuracy is same across both accelerators
         acc = metric.compute()
-        print(f"Accuracy on all data: {acc}, accelerator rank: {rank}")
+        logger.info(f"Accuracy on all data: {acc}, accelerator rank: {rank}")
 
         # Reseting internal state such that metric ready for new data
         metric.reset()
@@ -233,11 +244,18 @@ def main():
     parser.add_argument('-b', '--batch_size', default=64, type=int, metavar='N')
     parser.add_argument(
         '--model_path',
+        default="na",
         help="path to the quantized model's saved checkpoint for QAT",
-        default='na'
+        # default='/share/cdd/onnx_models/resnet_model_cle_bc.pt'
     )
-    parser.add_argument('--imagenet_dir', help="path to imagenet_dir", required=True)
-    parser.add_argument('--output_file', help="path to quantsim output file", required=True)
+    parser.add_argument('--imagenet_dir', 
+                        default=config_param.imagenet_dir,
+                        help="path to imagenet_dir", 
+                    )
+    parser.add_argument('--output_file', 
+                        default=f"{config_param.aimet_log_dir}/mobilenet_v2_qat.pth",
+                        help="path to quantsim output file", 
+                    )
     args = parser.parse_args()
 
     # STEP 1
@@ -263,7 +281,7 @@ def main():
 
     # Compute Encodings
     quant_sim.compute_encodings(forward_pass_callback, forward_pass_callback_args=None)
-    print("Finished Compute Encodings")
+    print_utils.print_colored_box("Finished Compute Encodings")
 
     # STEP 2
     dist_eval_func(quant_sim.model.cpu(), args.imagenet_dir, args.batch_size, args.world_size)

@@ -65,8 +65,9 @@ from Examples.common import config_param
 from Examples.common import image_net_config
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
-# os.environ["CUDA_VISIBLE_DEVICES"]="6, 7"
+
 os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
+
 
 logger_mangager = logging_utils.AsyncLoggerManager(
     work_dir=config_param.aimet_log_dir, 
@@ -146,7 +147,7 @@ def calculate_quantsim_accuracy(model: torch.nn.Module, evaluator: aimet_common.
     # Only 5 batches are used here to speed up the process, also the
     # number of images in these 5 batches should be sufficient for
     # compute encodings
-    iterations = 5
+    iterations = 10
 
     quantsim = QuantizationSimModel(model=model, quant_scheme='tf_enhanced',
                                     dummy_input=dummy_input, rounding_mode='nearest',
@@ -228,7 +229,7 @@ def cle_bc_example(config: argparse.Namespace):
     if config.use_cuda:
         model.to(torch.device('cuda'))
     model = model.eval()
-
+    
     # Calculate FP32 accuracy
     accuracy = data_pipeline.evaluate(model, use_cuda=config.use_cuda)
     logger.info("Original Model Top-1 accuracy = %.2f", accuracy)

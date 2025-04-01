@@ -58,14 +58,16 @@ from aimet_torch.cross_layer_equalization import equalize_model
 from aimet_torch.quantsim import QuantParams, QuantizationSimModel
 
 # imports for data pipelines
-from Examples.common import image_net_config
+from Examples.common import image_net_config, config_param
+
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_trainer import ImageNetTrainer
 
-logger = logging.getLogger('TorchQAT')
-formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
-logging.basicConfig(format=formatter)
+from spectrautils import logging_utils, print_utils
+
+logger_manager = logging_utils.AsyncLoggerManager(work_dir=config_param.aimet_log_dir, name_prefix="qat_resnet18_training")
+logger = logger_manager.logger
 
 
 ###
@@ -95,6 +97,7 @@ class ImageNetDataPipeline:
         :param _config:
         """
         self._config = _config
+        print("============ the train data set is =============\n",self._config.dataset_dir)
 
     def evaluate(self, model: torch.nn.Module, iterations: int = None, use_cuda: bool = False) -> float:
         """
@@ -111,7 +114,7 @@ class ImageNetDataPipeline:
         evaluator = ImageNetEvaluator(self._config.dataset_dir, image_size=image_net_config.dataset['image_size'],
                                       batch_size=image_net_config.evaluation['batch_size'],
                                       num_workers=image_net_config.evaluation['num_workers'])
-
+    
         return evaluator.evaluate(model, iterations, use_cuda)
 
     def finetune(self, model: torch.nn.Module):
@@ -123,6 +126,7 @@ class ImageNetDataPipeline:
 
         # Your code goes here instead of the example from below
 
+        
         trainer = ImageNetTrainer(self._config.dataset_dir, image_size=image_net_config.dataset['image_size'],
                                   batch_size=image_net_config.train['batch_size'],
                                   num_workers=image_net_config.train['num_workers'])
@@ -167,15 +171,29 @@ def apply_bias_correction(model: torch.nn.Module, data_loader: torch_data.DataLo
     # Number of samples used for bias correction
     num_bias_correct_samples = 16
 
-    params = QuantParams(weight_bw=8, act_bw=8, round_mode=rounding_mode, quant_scheme='tf_enhanced')
+    params = QuantParams(
+        weight_bw=8,
+        act_bw=8,
+        round_mode=rounding_mode,
+        quant_scheme='tf_enhanced')
 
     # Perform Bias Correction
-    bias_correction.correct_bias(model.to(device="cuda"), params, num_quant_samples=num_quant_samples,
-                                 data_loader=data_loader, num_bias_correct_samples=num_bias_correct_samples)
+    bias_correction.correct_bias(
+        model.to(device="cuda"), 
+        params, 
+        num_quant_samples=num_quant_samples,
+        data_loader=data_loader, 
+        num_bias_correct_samples=num_bias_correct_samples
+    )
 
 
-def calculate_quantsim_accuracy(model: torch.nn.Module, evaluator: aimet_common.defs.EvalFunction,
-                                use_cuda: bool = False, logdir: str = '') -> Tuple[torch.nn.Module, float]:
+def calculate_quantsim_accuracy(
+    model: torch.nn.Module, 
+    evaluator: aimet_common.defs.EvalFunction,
+    use_cuda: bool = False, 
+    logdir: str = ''
+) -> Tuple[torch.nn.Module, float]:
+    
     """
     Calculates model accuracy on quantized simulator and returns quantized model with accuracy.
 
@@ -190,9 +208,13 @@ def calculate_quantsim_accuracy(model: torch.nn.Module, evaluator: aimet_common.
     :return: a tuple of quantsim and accuracy of model on this quantsim
     """
 
-    input_shape = (1, image_net_config.dataset['image_channels'],
-                   image_net_config.dataset['image_width'],
-                   image_net_config.dataset['image_height'],)
+    input_shape = (
+        1, 
+        image_net_config.dataset['image_channels'],
+        image_net_config.dataset['image_width'],
+        image_net_config.dataset['image_height'],
+    )
+    
     if use_cuda:
         model.to(torch.device('cuda'))
         dummy_input = torch.rand(input_shape).cuda()
@@ -289,22 +311,25 @@ def quantization_aware_training_example(config: argparse.Namespace):
 
 
 if __name__ == '__main__':
-    default_logdir = os.path.join("benchmark_output", "QAT" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
 
     parser = argparse.ArgumentParser(
         description='Apply Quantization Aware Training (QAT) on pretrained ResNet18 model and evaluate on ImageNet dataset')
 
-    parser.add_argument('--dataset_dir', type=str,
-                        required=True,
+    parser.add_argument('--dataset_dir', 
+                        type=str,
+                        default=config_param.imagenet_dir,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
-    parser.add_argument('--use_cuda', action='store_true',
-                        required=True,
+    parser.add_argument('--use_cuda', 
+                        action='store_true',
+                        # required=True,
+                        default=True,
                         help='Add this flag to run the test on GPU.')
 
-    parser.add_argument('--logdir', type=str,
-                        default=default_logdir,
+    parser.add_argument('--logdir', 
+                        type=str,
+                        default=config_param.aimet_log_dir,
                         help="Path to a directory for logging.\
                               Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
 
@@ -324,11 +349,7 @@ if __name__ == '__main__':
 
     _config = parser.parse_args()
 
-    os.makedirs(_config.logdir, exist_ok=True)
 
-    fileHandler = logging.FileHandler(os.path.join(_config.logdir, "test.log"))
-    fileHandler.setFormatter(formatter)
-    logger.addHandler(fileHandler)
 
     if _config.use_cuda and not torch.cuda.is_available():
         logger.error('use_cuda is selected but no cuda device found.')
