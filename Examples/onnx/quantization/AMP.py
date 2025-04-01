@@ -47,11 +47,12 @@ DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'
 # 
 
 
-import torch
+import torch, os
 import onnxruntime as ort
 from Examples.common import image_net_config
 from Examples.onnx.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
+os.environ["CUDA_VISIBLE_DEVICES"]="7"
 
 class ImageNetDataPipeline:
 
@@ -103,9 +104,10 @@ pt_model = resnet18(pretrained=True)
 torch.onnx.export(pt_model.eval(),
                   dummy_input,
                   filename,
-                  training=torch.onnx.TrainingMode.PRESERVE,
+                  training=torch.onnx.TrainingMode.EVAL,
                   export_params=True,
-                  do_constant_folding=False,
+                  opset_version=13,                         # 添加opset版本
+                  do_constant_folding=True,
                   input_names=['input'],
                   output_names=['output'],
                   dynamic_axes={
@@ -299,7 +301,7 @@ candidates = [
 
 allowed_accuracy_drop = 0.001 # Allow 0.1%p accuracy drop
 
-results_dir = '/path/to/where/we/want/to/store/intermediate/and/final/results'
+results_dir = '/mnt/share_disk/bruce_trie/workspace/logs_aimet'
 
 amp_search_algo = AMPSearchAlgo.Binary
 
@@ -328,10 +330,13 @@ pareto_front_list = choose_mixed_precision(sim, candidates,
 # So we have a Mixed precision model after AMP. Now the next step would be to actually take this model to target. For this purpose, we need to export the model. 
 
 
-import os
-os.makedirs('./output/', exist_ok=True)
-sim.export(path='./output/', filename_prefix='resnet18_mixed_precision')
 
+import os
+os.makedirs('/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18_amp', exist_ok=True)
+sim.export(
+    path='/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18_amp',
+    filename_prefix='resnet18_mixed_precision'
+)
 
 # ---
 # ## Summary
