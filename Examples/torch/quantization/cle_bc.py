@@ -49,6 +49,10 @@ from functools import partial
 from torchvision import models
 import torch
 import torch.utils.data as torch_data
+from spectrautils import logging_utils
+from spectrautils import print_utils
+from spectrautils.onnx_utils import visualize_torch_model_weights
+print_utils.print_colored_box("请在项目所在的 !根目录! 执行该脚本")
 
 # imports for AIMET
 import aimet_common
@@ -57,13 +61,19 @@ from aimet_torch.cross_layer_equalization import equalize_model
 from aimet_torch.quantsim import QuantParams, QuantizationSimModel
 
 # imports for data pipelines
+from Examples.common import config_param
 from Examples.common import image_net_config
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
+# os.environ["CUDA_VISIBLE_DEVICES"]="6, 7"
+os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
 
-logger = logging.getLogger('TorchCLE-BC')
-formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
-logging.basicConfig(format=formatter)
+logger_mangager = logging_utils.AsyncLoggerManager(work_dir=config_param.aimet_log_dir, name_prefix="quant_resnet18_official")
+logger = logger_mangager.logger
+
+# logger = logging.getLogger('TorchCLE-BC')
+# formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
+# logging.basicConfig(format=formatter)
 
 
 ###
@@ -257,14 +267,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Apply Cross Layer Equalization and Bias Correction on pretrained '
                                                  'ResNet18 model and evaluate on ImageNet dataset')
 
-    parser.add_argument('--dataset_dir', type=str,
-                        required=True,
+    parser.add_argument('--dataset_dir', 
+                        type=str,
+                        default=config_param.imagenet_dir,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
 
-    parser.add_argument('--use_cuda', action='store_true',
-                        required=True,
+    parser.add_argument('--use_cuda', 
+                        # action='store_true',
+                        default=True,
                         help='Add this flag to run the test on GPU.')
 
     parser.add_argument('--logdir', type=str,
@@ -276,9 +288,9 @@ if __name__ == '__main__':
 
     os.makedirs(_config.logdir, exist_ok=True)
 
-    fileHandler = logging.FileHandler(os.path.join(_config.logdir, "test.log"))
-    fileHandler.setFormatter(formatter)
-    logger.addHandler(fileHandler)
+    # fileHandler = logging.FileHandler(os.path.join(_config.logdir, "test.log"))
+    # fileHandler.setFormatter(formatter)
+    # logger.addHandler(fileHandler)
 
     if _config.use_cuda and not torch.cuda.is_available():
         logger.error('use_cuda is selected but no cuda device found.')

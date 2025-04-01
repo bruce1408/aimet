@@ -49,7 +49,8 @@ from functools import partial
 from torchvision import models
 import torch
 import torch.utils.data as torch_data
-
+from spectrautils import logging_utils, print_utils, time_utils
+from spectrautils.onnx_utils import visualize_torch_model_weights
 # imports for AIMET
 import aimet_common
 from aimet_common.defs import QuantScheme
@@ -61,10 +62,16 @@ from aimet_torch.quantsim import QuantizationSimModel
 from Examples.common import image_net_config
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
+from Examples.common import config_param
 
-logger = logging.getLogger('TorchAdaround')
-formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
-logging.basicConfig(format=formatter)
+os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
+
+logger_manager = logging_utils.AsyncLoggerManager(work_dir = config_param.aimet_log_dir, name_prefix="quant_resnet18_official_adaround")
+logger = logger_manager.logger
+
+# logger = logging.getLogger('TorchAdaround')
+# formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
+# logging.basicConfig(format=formatter)
 
 
 ###
@@ -222,27 +229,26 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Apply Adaround on pretrained ResNet18 model and evaluate on ImageNet dataset')
 
-    parser.add_argument('--dataset_dir', type=str,
-                        required=True,
+    parser.add_argument('--dataset_dir', 
+                        type=str,
+                        default=config_param.imagenet_dir,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
-    parser.add_argument('--use_cuda', action='store_true',
-                        required=True,
+    parser.add_argument('--use_cuda', 
+                        # action='store_true',
+                        default=True,
                         help='Add this flag to run the test on GPU.')
 
-    parser.add_argument('--logdir', type=str,
+    parser.add_argument('--logdir', 
+                        type=str,
                         default=default_logdir,
                         help="Path to a directory for logging.\
                               Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
 
     _config = parser.parse_args()
-
-    os.makedirs(_config.logdir, exist_ok=True)
-
-    fileHandler = logging.FileHandler(os.path.join(_config.logdir, "test.log"))
-    fileHandler.setFormatter(formatter)
-    logger.addHandler(fileHandler)
+    
+    
 
     if _config.use_cuda and not torch.cuda.is_available():
         logger.error('use_cuda is selected but no cuda device found.')

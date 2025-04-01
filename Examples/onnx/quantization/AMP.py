@@ -69,7 +69,7 @@ class ImageNetDataPipeline:
         return data_loader
 
     @staticmethod
-    def evaluate(sess: ort.InferenceSession) -> float:
+    def evaluate(sess: ort.InferenceSession, *args) -> float:
         """
         Given a torch model, evaluates its Top-1 accuracy on the dataset
         :param sess: the model to evaluate
