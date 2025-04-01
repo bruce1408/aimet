@@ -68,13 +68,10 @@ from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
 # os.environ["CUDA_VISIBLE_DEVICES"]="6, 7"
 os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
 
-logger_mangager = logging_utils.AsyncLoggerManager(work_dir=config_param.aimet_log_dir, name_prefix="quant_resnet18_official")
+logger_mangager = logging_utils.AsyncLoggerManager(
+    work_dir=config_param.aimet_log_dir, 
+    name_prefix="quant_cle_resnet18_torch_official")
 logger = logger_mangager.logger
-
-# logger = logging.getLogger('TorchCLE-BC')
-# formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
-# logging.basicConfig(format=formatter)
-
 
 ###
 # This script utilizes AIMET to apply Cross Layer Equalization and Bias Correction on a resnet18
@@ -256,7 +253,7 @@ def cle_bc_example(config: argparse.Namespace):
     logger.info("Quantized (INT8) Model Top-1 Accuracy After Bias Correction = %.2f", accuracy)
 
     # Save the quantized model
-    torch.save(model, "resnet_model_cle_bc.pt")
+    torch.save(model, f"{config_param.aimet_log_dir}/resnet_model_cle_bc.pt")
 
     logger.info("Cross Layer Equalization (CLE) and Bias Correction (BC) complete")
 
@@ -285,12 +282,6 @@ if __name__ == '__main__':
                              "Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
 
     _config = parser.parse_args()
-
-    os.makedirs(_config.logdir, exist_ok=True)
-
-    # fileHandler = logging.FileHandler(os.path.join(_config.logdir, "test.log"))
-    # fileHandler.setFormatter(formatter)
-    # logger.addHandler(fileHandler)
 
     if _config.use_cuda and not torch.cuda.is_available():
         logger.error('use_cuda is selected but no cuda device found.')

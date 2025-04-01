@@ -66,7 +66,10 @@ from Examples.common import config_param
 
 os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
 
-logger_manager = logging_utils.AsyncLoggerManager(work_dir = config_param.aimet_log_dir, name_prefix="quant_resnet18_official_adaround")
+logger_manager = logging_utils.AsyncLoggerManager(
+    work_dir = config_param.aimet_log_dir,
+    name_prefix="quant_adaround_resnet18_torch_official")
+
 logger = logger_manager.logger
 
 # logger = logging.getLogger('TorchAdaround')

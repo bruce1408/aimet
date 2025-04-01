@@ -312,10 +312,19 @@ amp_search_algo = AMPSearchAlgo.Binary
 # 
 # Looking at the pareto curve, a user can decide if they want to change the accuracy drop. Note: If a user sets clean_start to False and change the allowed accuracy drop, then AMP will use cached data from results directory so that re-computation is avoided. 
 
+from aimet_onnx.mixed_precision import choose_mixed_precision
+
+# 使用一个简化的评估函数来加速Phase 1
+def evaluate_model_phase1(session, num_samples=1000):
+    return ImageNetDataPipeline.evaluate(session, num_samples)
+
+eval_callback_for_phase1 = CallbackFunc(evaluate_model_phase1, func_callback_args=1000)
+
 
 from aimet_onnx.mixed_precision import choose_mixed_precision
 
-pareto_front_list = choose_mixed_precision(sim, candidates,
+pareto_front_list = choose_mixed_precision(sim, 
+                                           candidates,
                                            eval_callback_for_phase1=eval_callback_for_phase1, 
                                            eval_callback_for_phase2=eval_callback_for_phase2, 
                                            allowed_accuracy_drop=allowed_accuracy_drop, 
@@ -332,10 +341,10 @@ pareto_front_list = choose_mixed_precision(sim, candidates,
 
 
 import os
-os.makedirs('/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18_amp', exist_ok=True)
+os.makedirs('/mnt/share_disk/bruce_trie/workspace/logs_aimet/quant_resnet18_onnx_amp', exist_ok=True)
 sim.export(
-    path='/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18_amp',
-    filename_prefix='resnet18_mixed_precision'
+    path='/mnt/share_disk/bruce_trie/workspace/logs_aimet/quant_resnet18_onnx_amp',
+    filename_prefix='resnet18_onnx_amp_mixed_precision'
 )
 
 # ---
