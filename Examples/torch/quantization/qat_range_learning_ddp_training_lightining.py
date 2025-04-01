@@ -116,6 +116,8 @@ class LitImageNet(LightningModule):
             
         logits = self.model(images)
         loss = F.cross_entropy(logits, labels)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+
         return loss
 
     def validation_step(self, batch, _):
@@ -127,11 +129,13 @@ class LitImageNet(LightningModule):
         logits = self.model(images)
         loss = F.cross_entropy(logits, labels)
         pred = torch.argmax(logits, dim=1)
-        self.accuracy(pred, labels)
+        
+        # 使用update方法更新指标状态
+        self.accuracy.update(pred, labels)
 
         #self.log is pytorch's inbuilt definition.
-        self.log("val_loss", loss, on_epoch=True, on_step=False, prog_bar=True)
-        self.log("val_acc", self.accuracy, on_epoch=True, on_step=False, prog_bar=True)
+        self.log("val_loss", loss, on_epoch=True, on_step=False, prog_bar=True, sync_dist=True)
+        # self.log("val_acc", self.accuracy, on_epoch=True, on_step=False, prog_bar=True)
         return loss
 
     # def validation_epoch_end(self, _):
@@ -145,24 +149,15 @@ class LitImageNet(LightningModule):
 
     
     def on_validation_epoch_end(self):
-        """ Runs at the end of validation step to print accuracy """
-        # val_accuracy = self.accuracy.compute()
-        # if self.trainer.is_global_zero:
-        #     print_utils.print_colored_box("\nVALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
-            
-        # #Resetting accuracy is not mandatory in more latest releases.
-        # self.accuracy.reset()
-        
+        """ Runs at the end of validation step to print accuracy """        
         if self.accuracy._update_called:  # 检查是否已经调用了update
             val_accuracy = self.accuracy.compute()
             if self.trainer.is_global_zero:
-                print_utils.print_colored_box("\nVALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
+                print_utils.print_colored_box("VALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
             self.accuracy.reset()
         else:
             logger.warning("Accuracy metric was not updated during validation")
 
-            
-        
 
     def test_step(self, batch, batch_idx):
         """ Runs validation """
@@ -212,20 +207,15 @@ class LitImageNet(LightningModule):
 
 #=======================setting up arguments===================
 def main():
-    """ Main function """
+    
     # STEP 1
     parser = argparse.ArgumentParser(description='PyTorch Lightning DDP')
     parser.add_argument('--epochs', default=1, type=int, metavar='N', help='number of total epochs to run')
-    parser.add_argument('-b', '--batch_size', default=128, type=int,
-                        metavar='N')
-    parser.add_argument('--learning_rate', default=0.000001, type=float,
-                        help='initial learning rate')
-    parser.add_argument('--num_classes', default=1000, type=int,
-                        help='Number of classes for the network.')
-    parser.add_argument('--model_path', 
-                        help="path to the quantized model's saved checkpoint for QAT", 
-                        default='/mnt/share_disk/bruce_trie/workspace/logs_aimet/mobilenet_v2_qat.pth'
-                    )
+    parser.add_argument('-b', '--batch_size', default=128, type=int, metavar='N')
+    parser.add_argument('--learning_rate', default=0.000001, type=float, help='initial learning rate')
+    parser.add_argument('--num_classes', default=1000, type=int, help='Number of classes for the network.')
+    parser.add_argument('--model_path', help="path to the quantized model's saved checkpoint for QAT", 
+                        default='/mnt/share_disk/bruce_trie/workspace/logs_aimet/mobilenet_v2_qat.pth')
     parser.add_argument('--imagenet_dir', default=config_param.imagenet_dir, help="path to imagenet_dir", )
     
     args = parser.parse_args()
@@ -246,13 +236,13 @@ def main():
 
     #Define the trainer here.
     trainer = pl.Trainer(
-        deterministic=True,# For full reproducibility. Does not work with DP. Only for DDP.
-        strategy='DDP',# Sets the DDP strategy for lightning
+        deterministic=True, # For full reproducibility. Does not work with DP. Only for DDP.
+        strategy='DDP',     # Sets the DDP strategy for lightning
         accelerator='gpu',
-        devices=-1,# -1 means all available GPUs
+        devices=-1,         # -1 means all available GPUs
         max_epochs=args.epochs,
         limit_train_batches=10,
-        log_every_n_steps=5,  # 将日志间隔设置为更小的值
+        log_every_n_steps=5,    # 将日志间隔设置为更小的值
         inference_mode= False
 
     )
@@ -265,3 +255,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
