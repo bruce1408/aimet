@@ -37,7 +37,6 @@ from Examples.common import config_param
 from torchvision import transforms, datasets
 os.environ["CUDA_VISIBLE_DEVICES"]=config_param.cuda_ids
 
-# DATASET_DIR = '/path/to/dataset'   # Please replace this with a real directory
 DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'         
 
 val_transforms = transforms.Compose([
