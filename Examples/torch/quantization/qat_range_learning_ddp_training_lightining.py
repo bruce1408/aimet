@@ -210,12 +210,36 @@ def main():
     
     # STEP 1
     parser = argparse.ArgumentParser(description='PyTorch Lightning DDP')
-    parser.add_argument('--epochs', default=1, type=int, metavar='N', help='number of total epochs to run')
-    parser.add_argument('-b', '--batch_size', default=128, type=int, metavar='N')
-    parser.add_argument('--learning_rate', default=0.000001, type=float, help='initial learning rate')
-    parser.add_argument('--num_classes', default=1000, type=int, help='Number of classes for the network.')
-    parser.add_argument('--model_path', help="path to the quantized model's saved checkpoint for QAT", 
-                        default='/mnt/share_disk/bruce_trie/workspace/logs_aimet/mobilenet_v2_qat.pth')
+    parser.add_argument('--epochs', 
+                        default=10,
+                        type=int, 
+                        metavar='N',
+                        help='number of total epochs to run'
+                    )
+    
+    parser.add_argument('-b', 
+                        '--batch_size',
+                        default=128,
+                        type=int, 
+                        metavar='N'
+                    )
+    
+    parser.add_argument('--learning_rate', 
+                        default=0.000001, 
+                        type=float,
+                        help='initial learning rate')
+    
+    parser.add_argument('--num_classes', 
+                        default=1000, 
+                        type=int, 
+                        help='Number of classes for the network.'
+                    )
+    
+    parser.add_argument('--model_path', 
+                        help="path to the quantized model's saved checkpoint for QAT", 
+                        default='/mnt/share_disk/bruce_trie/workspace/logs_aimet/mobilenet_v2_qat.pth'
+                    )
+    
     parser.add_argument('--imagenet_dir', default=config_param.imagenet_dir, help="path to imagenet_dir", )
     
     args = parser.parse_args()

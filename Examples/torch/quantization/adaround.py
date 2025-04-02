@@ -227,7 +227,7 @@ def adaround_example(config: argparse.Namespace):
 
 
 if __name__ == '__main__':
-    default_logdir = os.path.join("benchmark_output", "adaround_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
+    # default_logdir = os.path.join("benchmark_output", "adaround_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
 
     parser = argparse.ArgumentParser(
         description='Apply Adaround on pretrained ResNet18 model and evaluate on ImageNet dataset')
@@ -245,7 +245,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--logdir', 
                         type=str,
-                        default=default_logdir,
+                        default=config_param.aimet_log_dir,
                         help="Path to a directory for logging.\
                               Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
 

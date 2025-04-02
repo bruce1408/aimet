@@ -58,6 +58,7 @@ import onnxruntime as ort
 from Examples.common import image_net_config
 from Examples.onnx.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
+from Examples.common import config_param
 os.environ["CUDA_VISIBLE_DEVICES"]="7"
 
 
@@ -315,7 +316,7 @@ sim = QuantizationSimModel(model=ada_model,
                            default_param_bw=8,
                            use_cuda=use_cuda)
 
-sim.set_and_freeze_param_encodings(encoding_path=os.path.join("output", 'adaround.encodings'))
+sim.set_and_freeze_param_encodings(encoding_path=os.path.join(config_param.aimet_log_dir, 'adaround.encodings'))
 
 sim.compute_encodings(forward_pass_callback=pass_calibration_data,
                       forward_pass_callback_args=1000)
