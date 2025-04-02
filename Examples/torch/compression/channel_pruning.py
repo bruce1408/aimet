@@ -50,7 +50,6 @@ from typing import Tuple
 from torchvision import models
 import torch
 import torch.utils.data as torch_data
-
 # imports for AIMET
 import aimet_common.defs
 import aimet_torch.defs
@@ -61,11 +60,13 @@ from Examples.common import image_net_config
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_trainer import ImageNetTrainer
+from Examples.common import config_param
+from spectrautils import logging_utils, print_utils
 
-logger = logging.getLogger('TorchChannelPruning')
-formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
-logging.basicConfig(format=formatter)
+os.environ["CUDA_VISIBLE_DEVICES"]=config_param.cuda_ids
 
+logger_manager = logging_utils.AsyncLoggerManager(work_dir=config_param.aimet_log_dir, name_prefix="channel_pruning")
+logger = logger_manager.logger
 
 ###
 # This script utilize AIMET to perform channel pruning compression (0.5% ratio) on a resnet18
@@ -246,23 +247,25 @@ def channel_pruning_example(config: argparse.Namespace):
 
 
 if __name__ == '__main__':
-    default_logdir = os.path.join("benchmark_output",
-                                  "channel_prunning_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
-
+    
+    
     parser = argparse.ArgumentParser(
         description='Apply Channel Pruning on pretrained ResNet18 model and finetune it for ImageNet dataset')
 
-    parser.add_argument('--dataset_dir', type=str,
-                        required=True,
+    parser.add_argument('--dataset_dir', 
+                        type=str,
+                        default=config_param.imagenet_dir,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
-    parser.add_argument('--use_cuda', action='store_true',
-                        required=True,
+    parser.add_argument('--use_cuda', 
+                        # action='store_true',
+                        default=True,
                         help='Add this flag to run the test on GPU.')
 
-    parser.add_argument('--logdir', type=str,
-                        default=default_logdir,
+    parser.add_argument('--logdir',
+                        type=str,
+                        default=config_param.aimet_log_dir,
                         help="Path to a directory for logging.\
                               Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
 
@@ -282,11 +285,6 @@ if __name__ == '__main__':
 
     _config = parser.parse_args()
 
-    os.makedirs(_config.logdir, exist_ok=True)
-
-    fileHandler = logging.FileHandler(os.path.join(_config.logdir, "test.log"))
-    fileHandler.setFormatter(formatter)
-    logger.addHandler(fileHandler)
 
     if _config.use_cuda and not torch.cuda.is_available():
         logger.error('use_cuda is selected but no cuda device found.')

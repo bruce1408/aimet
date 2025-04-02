@@ -30,6 +30,7 @@ unit_test_results
 
 # Other generated files
 *.swp
+*.pkl
 packaging/setup_cfg.py
 
 **benchmark_output/

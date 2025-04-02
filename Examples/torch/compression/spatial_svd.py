@@ -55,13 +55,16 @@ import aimet_torch
 from aimet_torch.compress import ModelCompressor
 
 # imports for data pipelines
-from Examples.common import image_net_config
+from Examples.common import image_net_config, config_param
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_trainer import ImageNetTrainer
+from spectrautils import logging_utils, print_utils
 
-logger = logging.getLogger('TorchSpatialSVD')
-formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
-logging.basicConfig(format=formatter)
+logger_manager = logging_utils.AsyncLoggerManager(work_dir=config_param.aimet_log_dir, name_prefix="spaatial_svd")
+logger = logger_manager.logger
+
+os.environ["CUDA_VISIBLE_DEVICES"]=config_param.cuda_ids
+
 
 
 ###
@@ -239,17 +242,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Apply Spatial SVD on pretrained ResNet18 model and finetune it for ImageNet dataset')
 
-    parser.add_argument('--dataset_dir', type=str,
-                        required=True,
+    parser.add_argument('--dataset_dir',
+                        type=str,
+                        # required=True,
+                        default=config_param.imagenet_dir,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
-    parser.add_argument('--use_cuda', action='store_true',
-                        required=True,
+    parser.add_argument('--use_cuda',
+                        # action='store_true',
+                        default=True,
                         help='Add this flag to run the test on GPU.')
 
-    parser.add_argument('--logdir', type=str,
-                        default=default_logdir,
+    parser.add_argument('--logdir', 
+                        type=str,
+                        default=config_param.aimet_log_dir,
                         help="Path to a directory for logging.\
                               Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
 
@@ -268,12 +275,6 @@ if __name__ == '__main__':
                               Default is [5, 10]")
 
     _config = parser.parse_args()
-
-    os.makedirs(_config.logdir, exist_ok=True)
-
-    fileHandler = logging.FileHandler(os.path.join(_config.logdir, "test.log"))
-    fileHandler.setFormatter(formatter)
-    logger.addHandler(fileHandler)
 
     if _config.use_cuda and not torch.cuda.is_available():
         logger.error('use_cuda is selected but no cuda device found.')
