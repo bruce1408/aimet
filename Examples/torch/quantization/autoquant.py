@@ -32,7 +32,6 @@
 # 
 # Edit the cell below and specify the directory where the downloaded ImageNet dataset is saved.
 
-
 import os
 from Examples.common import config_param
 from torchvision import transforms, datasets
