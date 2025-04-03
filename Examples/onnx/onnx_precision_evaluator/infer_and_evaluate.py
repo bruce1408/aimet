@@ -8,7 +8,8 @@ from typing import Tuple
 from Examples.common import config_param
 from Examples.common import image_net_config
 from Examples.torch.utils.image_net_data_loader import ImageFolder
-from spectrautils import logging_utils
+from spectrautils import logging_utils,print_utils,time_utils
+
 os.environ["CUDA_VISIBLE_DEVICES"]=config_param.cuda_ids
 
 
@@ -33,7 +34,7 @@ parser.add_argument('--logdir',
 
 parser.add_argument('--log_prefix', 
                    type=str,
-                   default="resnet18_onnx",
+                   default="resnet18_onnx_acc",
                    help='Custom prefix for log files')
 
 
@@ -63,7 +64,7 @@ def prepare_data(dataset_dir, num_samples_per_class=1000):
     
     return data_set
 
-
+@time_utils.time_it
 def evaluate_model(session: ort.InferenceSession, dataset: ImageFolder) -> Tuple[int, float]:
     """评估ONNX模型"""
     correct = 0
@@ -91,6 +92,8 @@ def main():
     # 准备数据和模型
     dataset = prepare_data(_config.dataset_dir)
     providers = ['CUDAExecutionProvider'] if _config.use_cuda else ['CPUExecutionProvider']
+    
+    # 加载模型
     session = ort.InferenceSession(config_param.onnx_resnet18_path, providers=providers)
     
     # 评估模型

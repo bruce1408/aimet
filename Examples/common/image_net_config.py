@@ -58,6 +58,6 @@ evaluation = {
 }
 
 train = {
-    "batch_size"        :       64,
+    "batch_size"        :       128,
     "num_workers"       :       16
 }
