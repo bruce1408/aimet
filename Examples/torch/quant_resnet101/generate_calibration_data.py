@@ -218,9 +218,7 @@ def process_validation_dataset(val_data_path, val_raw_data):
             transform=val_transforms
     )
     
-    _data_loader = torch_data.DataLoader(
-        data_set, batch_size=1, shuffle=False,
-        num_workers=16, pin_memory=True)
+    _data_loader = torch_data.DataLoader(data_set, batch_size=1, shuffle=False, num_workers=16, pin_memory=True)
 
     txt_file_path = os.path.join(val_raw_data, '/mnt/share_disk/bruce_trie/workspace/perception_quanti/demo_18/index_label.txt')
 
