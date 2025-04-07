@@ -143,8 +143,7 @@ class ImageFolder(Dataset):
 
     @staticmethod
     def _find_classes(directory: str):
-        classes = [d for d in os.listdir(directory) if
-                   os.path.isdir(os.path.join(directory, d))]
+        classes = [d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))]
         classes.sort()
         class_to_idx = {classes[i]: i for i in range(len(classes))}
         return classes, class_to_idx

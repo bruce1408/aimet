@@ -103,14 +103,14 @@ class ImageNetEvaluator:
 
         model = model.to(device)
         model = model.eval()
-
+        
         batch_cntr = 1
         with progressbar.ProgressBar(max_value=iterations) as progress_bar:
             with torch.no_grad():
-                for input_data, target_data in self._val_data_loader:
+                for input_data, input_label in self._val_data_loader:
 
                     inputs_batch = input_data.to(device)
-                    target_batch = target_data.to(device)
+                    target_batch = input_label.to(device)
 
                     predicted_batch = model(inputs_batch)
 
