@@ -1,7 +1,7 @@
 
-cuda_ids = "6, 7"
+cuda_ids = "3,4,5,6"
 
-imagenet_dir = "/mnt/share_disk/bruce_trie/outputs/imagenet_dataset"
+imagenet_dir = "/mnt/share_disk/bruce_trie/imagenet"
 
 aimet_log_dir = "/mnt/share_disk/bruce_trie/workspace/logs_aimet"
 
