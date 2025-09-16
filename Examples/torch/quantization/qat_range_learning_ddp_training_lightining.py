@@ -153,12 +153,13 @@ class LitImageNet(LightningModule):
         if self.accuracy._update_called:  # 检查是否已经调用了update
             val_accuracy = self.accuracy.compute()
             if self.trainer.is_global_zero:
-                print_utils.print_colored_box("VALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
+                # print_utils.print_colored_box("VALIDATION ACCURACY ===> ", val_accuracy.cpu().detach().numpy())
+                print(f"VALIDATION ACCURACY ===> {val_accuracy.cpu().detach().numpy()}")
             self.accuracy.reset()
         else:
             logger.warning("Accuracy metric was not updated during validation")
 
-
+    
     def test_step(self, batch, batch_idx):
         """ Runs validation """
         return self.validation_step(batch, batch_idx)

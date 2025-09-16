@@ -35,7 +35,7 @@
 
 
 # DATASET_DIR = '/path/to/dataset/'         # Please replace this with a real directory
-DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'         
+# DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'         
 
 
 # ---
@@ -54,7 +54,12 @@ from Examples.common import image_net_config,config_param
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_trainer import ImageNetTrainer
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
+from Examples.common import config_param
+from torchvision.models import resnet18
+
+
 os.environ["CUDA_VISIBLE_DEVICES"]=config_param.cuda_ids
+DATASET_DIR = config_param.imagenet_dir
 
 class ImageNetDataPipeline:
 
@@ -63,11 +68,13 @@ class ImageNetDataPipeline:
         """
         Instantiates a validation dataloader for ImageNet dataset and returns it
         """
-        data_loader = ImageNetDataLoader(DATASET_DIR,
-                                         image_size=image_net_config.dataset['image_size'],
-                                         batch_size=image_net_config.evaluation['batch_size'],
-                                         is_training=False,
-                                         num_workers=image_net_config.evaluation['num_workers']).data_loader
+        data_loader = ImageNetDataLoader(
+            DATASET_DIR,
+            image_size=image_net_config.dataset['image_size'],
+            batch_size=image_net_config.evaluation['batch_size'],
+            is_training=False,
+            num_workers=image_net_config.evaluation['num_workers']).data_loader
+        
         return data_loader
 
     @staticmethod
@@ -77,9 +84,12 @@ class ImageNetDataPipeline:
         :param model: the model to evaluate
         :param use_cuda: whether or not the GPU should be used.
         """
-        evaluator = ImageNetEvaluator(DATASET_DIR, image_size=image_net_config.dataset['image_size'],
-                                      batch_size=image_net_config.evaluation['batch_size'],
-                                      num_workers=image_net_config.evaluation['num_workers'])
+        evaluator = ImageNetEvaluator(
+            DATASET_DIR, 
+            image_size=image_net_config.dataset['image_size'],
+            batch_size=image_net_config.evaluation['batch_size'],
+            num_workers=image_net_config.evaluation['num_workers']
+        )
 
         return evaluator.evaluate(model, iterations=None, use_cuda=use_cuda)
 
@@ -93,22 +103,27 @@ class ImageNetDataPipeline:
         :param learning_rate_schedule: The learning rate schedule used during the finetuning step.
         :param use_cuda: whether or not the GPU should be used.
         """
-        trainer = ImageNetTrainer(DATASET_DIR, image_size=image_net_config.dataset['image_size'],
-                                  batch_size=image_net_config.train['batch_size'],
-                                  num_workers=image_net_config.train['num_workers'])
+        trainer = ImageNetTrainer(
+            DATASET_DIR, 
+            image_size=image_net_config.dataset['image_size'],
+            batch_size=image_net_config.train['batch_size'],
+            num_workers=image_net_config.train['num_workers']
+        )
 
-        trainer.train(model, max_epochs=epochs, learning_rate=learning_rate,
-                      learning_rate_schedule=learning_rate_schedule, use_cuda=use_cuda)
-
+        trainer.train(
+            model, 
+            max_epochs=epochs,
+            learning_rate=learning_rate,
+            learning_rate_schedule=learning_rate_schedule,
+            use_cuda=use_cuda
+        )
 
 # ---
 # ## 2. Load the model and evaluate to get a baseline FP32 accuracy score
 
-
 # For this example notebook, we are going to load a pretrained resnet18 model from torchvision. Similarly, you can load any pretrained PyTorch model instead.
 
 
-from torchvision.models import resnet18
 
 model = resnet18(pretrained=True)
 
@@ -135,7 +150,6 @@ if torch.cuda.is_available():
 
 # ---
 # Let's determine the FP32 (floating point 32-bit) accuracy of this model using the evaluate() routine
-
 
 accuracy = ImageNetDataPipeline.evaluate(model, use_cuda)
 print(accuracy)

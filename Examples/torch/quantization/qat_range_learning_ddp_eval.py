@@ -218,20 +218,21 @@ def evaluate_ddp(rank, world_size, port_id, model, imagenet_dir, batch_size, res
             acc = metric(output, target)
 
             print_freq = 10
-            if rank in [0, 1] and i % print_freq == 0:  # print only for rank 0
+            if rank==0 and i % print_freq == 0:  # print only for rank 0
                 logger.info(f"Accuracy on batch {i}: {acc} - rank {rank}")
 
         # metric on all batches and all accelerators using custom accumulation
         # accuracy is same across both accelerators
         acc = metric.compute()
-        logger.info(f"Accuracy on all data: {acc}, accelerator rank: {rank}")
+        if rank ==0 :  # print only for rank 0
+            logger.info(f"Accuracy on all data: {acc}, accelerator rank: {rank}")
 
         # Reseting internal state such that metric ready for new data
         metric.reset()
 
     if rank == 0:
         results['top-1 acc'] = float(acc)
-    # cleanup
+    
     dist.destroy_process_group()
 
 

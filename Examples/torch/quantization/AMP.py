@@ -35,7 +35,6 @@
 
 
 # DATASET_DIR = '/path/to/dataset'         # Please replace this with a real directory
-DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'         
 
 
 # ---
@@ -50,7 +49,9 @@ from torchvision.datasets.imagenet import ImageFolder
 from torchvision import transforms as T
 from tqdm import tqdm
 from Examples.common import image_net_config
+from Examples.common import config_param
  
+DATASET_DIR = config_param.imagenet_dir
 
 def get_val_dataloader(num_samples=None):
     root = os.path.join(DATASET_DIR, 'val')
