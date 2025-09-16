@@ -62,6 +62,7 @@ from aimet_torch.quantsim import QuantizationSimModel
 from Examples.common import image_net_config
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_trainer import ImageNetTrainer
+from Examples.common import config_param
 
 
 logger = logging.getLogger('TorchRangeLearning')
@@ -253,28 +254,36 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Quantization aware training of pretrained ResNet18 model using range learning')
 
-    parser.add_argument('--dataset_dir', type=str,
-                        required=True,
+    parser.add_argument('--dataset_dir', 
+                        default=config_param.imagenet_dir,
+                        type=str,
+                        # required=True,
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
-                              'train': for training dataset and 'val': for validation dataset")
-    parser.add_argument('--use_cuda', action='store_true',
-                        required=True,
+                              'train': for training dataset and 'val': for validation dataset"
+                        )
+    
+    parser.add_argument('--use_cuda', 
+                        default=True,
+                        # action='store_true',
+                        # required=True,
                         help='Add this flag to run the test on GPU.')
 
     parser.add_argument('--logdir', type=str,
                         default=default_logdir,
                         help="Path to a directory for logging.\
-                              Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
+                              Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'"
+                        )
 
     parser.add_argument('--epochs', type=int,
                         default=15,
-                        help="Number of epochs for finetuning.\n\
-                              Default is 15")
+                        help="Number of epochs for finetuning. Default is 15"
+                    )
+    
     parser.add_argument('--learning_rate', type=float,
                         default=1e-2,
-                        help="A float type learning rate for model finetuning.\n\
-                              default is 0.01")
+                        help="A float type learning rate for model finetuning. default is 0.01"
+                    )
     parser.add_argument('--learning_rate_schedule', type=list,
                         default=[5, 10],
                         help="A list of epoch indices for learning rate schedule used in finetuning.\n\
@@ -285,7 +294,7 @@ if __name__ == '__main__':
 
     os.makedirs(_config.logdir, exist_ok=True)
 
-    fileHandler = logging.FileHandler(os.path.join(_config.logdir, "test.log"))
+    fileHandler = logging.FileHandler(os.path.join(_config.logdir, "range_learning.log"))
     fileHandler.setFormatter(formatter)
     logger.addHandler(fileHandler)
 

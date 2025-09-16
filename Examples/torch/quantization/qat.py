@@ -159,10 +159,16 @@ print(accuracy)
 # ## 3. Create a quantization simulation model and determine quantized accuracy
 # 
 # ## Fold Batch Normalization layers
-# Before we determine the simulated quantized accuracy using QuantizationSimModel, we will fold the BatchNormalization (BN) layers in the model. These layers get folded into adjacent Convolutional layers. The BN layers that cannot be folded are left as they are.
+# Before we determine the simulated quantized accuracy using QuantizationSimModel, we will fold the BatchNormalization (BN) layers in the model. 
+# These layers get folded into adjacent Convolutional layers. The BN layers that cannot be folded are left as they are.
 # 
 # **Why do we need to this?**
-# On quantized runtimes (like TFLite, SnapDragon Neural Processing SDK, etc.), it is a common practice to fold the BN layers. Doing so, results in an inferences/sec speedup since unnecessary computation is avoided. Now from a floating point compute perspective, a BN-folded model is mathematically equivalent to a model with BN layers from an inference perspective, and produces the same accuracy. However, folding the BN layers can increase the range of the tensor values for the weight parameters of the adjacent layers. And this can have a negative impact on the quantized accuracy of the model (especially when using INT8 or lower precision). So, we want to simulate that on-target behavior by doing BN folding here.
+# On quantized runtimes (like TFLite, SnapDragon Neural Processing SDK, etc.), it is a common practice to fold the BN layers. Doing so, 
+# results in an inferences/sec speedup since unnecessary computation is avoided. Now from a floating point compute perspective, 
+# a BN-folded model is mathematically equivalent to a model with BN layers from an inference perspective, 
+# and produces the same accuracy. However, folding the BN layers can increase the range of the tensor values for the weight parameters of the adjacent layers. 
+# And this can have a negative impact on the quantized accuracy of the model (especially when using INT8 or lower precision). 
+# So, we want to simulate that on-target behavior by doing BN folding here.
 # 
 # The following code calls AIMET to fold the BN layers in-place on the given model
 
@@ -213,7 +219,9 @@ print(sim)
 
 
 # ---
-# Even though AIMET has added 'quantizer' nodes to the model graph but the model is not ready to be used yet. Before we can use the sim model for inference or training, we need to find appropriate scale/offset quantization parameters for each 'quantizer' node. For activation quantization nodes, we need to pass unlabeled data samples through the model to collect range statistics which will then let AIMET calculate appropriate scale/offset quantization parameters. This process is sometimes referred to as calibration. AIMET simply refers to it as 'computing encodings'.
+# Even though AIMET has added 'quantizer' nodes to the model graph but the model is not ready to be used yet. 
+# Before we can use the sim model for inference or training, we need to find appropriate scale/offset quantization parameters for each 'quantizer' node.
+# For activation quantization nodes, we need to pass unlabeled data samples through the model to collect range statistics which will then let AIMET calculate appropriate scale/offset quantization parameters. This process is sometimes referred to as calibration. AIMET simply refers to it as 'computing encodings'.
 # 
 # So we create a routine to pass unlabeled data samples through the model. This should be fairly simple - use the existing train or validation data loader to extract some samples and pass them to the model. We don't need to compute any loss metric etc. So we can just ignore the model output for this purpose. A few pointers regarding the data samples
 # - In practice, we need a very small percentage of the overall data samples for computing encodings. For example, the training dataset for ImageNet has 1M samples. For computing encodings we only need 500 or 1000 samples.
@@ -247,15 +255,19 @@ def pass_calibration_data(sim_model, use_cuda):
 
 
 # ---
-# Now we call AIMET to use the above routine to pass data through the model and then subsequently compute the quantization encodings. Encodings here refer to scale/offset quantization parameters.
+# Now we call AIMET to use the above routine to pass data through the model and then subsequently compute the quantization encodings. 
+# Encodings here refer to scale/offset quantization parameters.
 
 
-sim.compute_encodings(forward_pass_callback=pass_calibration_data,
-                      forward_pass_callback_args=use_cuda)
+sim.compute_encodings(
+    forward_pass_callback=pass_calibration_data,
+    forward_pass_callback_args=use_cuda
+)
 
 
-# ---
-# Now the QuantizationSim model is ready to be used for inference or training. First we can pass this model to the same evaluation routine we used before. The evaluation routine will now give us a simulated quantized accuracy score for INT8 quantization instead of the FP32 accuracy score we saw before.
+# Now the QuantizationSim model is ready to be used for inference or training. 
+# First we can pass this model to the same evaluation routine we used before. 
+# The evaluation routine will now give us a simulated quantized accuracy score for INT8 quantization instead of the FP32 accuracy score we saw before.
 
 
 accuracy = ImageNetDataPipeline.evaluate(sim.model, use_cuda)
@@ -265,7 +277,10 @@ print(accuracy)
 # ---
 # ## 4. Perform QAT
 # 
-# To perform quantization aware training (QAT), we simply train the model for a few more epochs (typically 15-20). As with any training job, hyper-parameters need to be searched for optimal results. Good starting points are to use a learning rate on the same order as the ending learning rate when training the original model, and to drop the learning rate by a factor of 10 every 5 epochs or so.
+# To perform quantization aware training (QAT), we simply train the model for a few more epochs (typically 15-20). 
+# As with any training job, hyper-parameters need to be searched for optimal results. 
+# Good starting points are to use a learning rate on the same order as the ending learning rate when training the original model, 
+# and to drop the learning rate by a factor of 10 every 5 epochs or so.
 # 
 # For the purpose of this example notebook, we are going to train only for 1 epoch. But feel free to change these parameters as you see fit.
 
@@ -282,9 +297,13 @@ print(finetuned_accuracy)
 
 
 # ---
-# Depending on your settings you may have observed a slight gain in accuracy after one epoch of training. Ofcourse, this was just an example. Please try this against the model of your choice and play with the hyper-parameters to get the best results.
+# Depending on your settings you may have observed a slight gain in accuracy after one epoch of training. 
+# Ofcourse, this was just an example. Please try this against the model of your choice and play with the hyper-parameters to get the best results.
 # 
-# So we have an improved model after QAT. Now the next step would be to actually take this model to target. For this purpose, we need to export the model with the updated weights without the fake quant ops. And also to export the encodings (scale/offset quantization parameters) that were updated during training since we employed QAT with range-learning. AIMET QuantizationSimModel provides an export API for this purpose.
+# So we have an improved model after QAT. Now the next step would be to actually take this model to target. 
+# For this purpose, we need to export the model with the updated weights without the fake quant ops. 
+# And also to export the encodings (scale/offset quantization parameters) that were updated during training since we employed QAT with range-learning.
+# AIMET QuantizationSimModel provides an export API for this purpose.
 
 
 os.makedirs(config_param.aimet_log_dir, exist_ok=True)

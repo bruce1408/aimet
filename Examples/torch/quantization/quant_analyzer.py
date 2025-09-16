@@ -31,8 +31,8 @@
 # Edit the cell below and specify the directory where the downloaded ImageNet dataset is saved.
 
 
-DATASET_DIR = '/path/to/dataset/'         # Please replace this with a real directory
-DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'         
+# DATASET_DIR = '/path/to/dataset/'         # Please replace this with a real directory
+# DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'         
 
 
 # ---
@@ -56,7 +56,10 @@ from Examples.common import image_net_config, config_param
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 from spectrautils import logging_utils, print_utils
+from Examples.common import config_param
+
 os.environ["CUDA_VISIBLE_DEVICES"]=config_param.cuda_ids
+DATASET_DIR = config_param.imagenet_dir
 
 logger_manager = logging_utils.AsyncLoggerManager(work_dir=config_param.aimet_log_dir, name_prefix="quant_resnet18_analysis")
 logger = logger_manager.logger
