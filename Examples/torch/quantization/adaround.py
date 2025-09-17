@@ -234,8 +234,6 @@ def adaround_example(config: argparse.Namespace):
 
 
 if __name__ == '__main__':
-    # default_logdir = os.path.join("benchmark_output", "adaround_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
-
     parser = argparse.ArgumentParser(description='Apply Adaround on pretrained ResNet18 model and evaluate on ImageNet dataset')
 
     parser.add_argument('--dataset_dir', 
@@ -244,6 +242,7 @@ if __name__ == '__main__':
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
+    
     parser.add_argument('--use_cuda', 
                         default=True,
                         help='Add this flag to run the test on GPU.')
