@@ -43,15 +43,15 @@ technique.
 import argparse
 import copy
 import logging
-import os
+import os,time
 from datetime import datetime
 from functools import partial
 from torchvision import models
-import torch
+import torch,shutil
 import torch.utils.data as torch_data
 from spectrautils import logging_utils, print_utils, time_utils
 from spectrautils.onnx_utils import visualize_torch_model_weights
-# imports for AIMET
+
 import aimet_common
 from aimet_common.defs import QuantScheme
 from aimet_torch.adaround.adaround_weight import Adaround, AdaroundParameters
@@ -199,6 +199,11 @@ def adaround_example(config: argparse.Namespace):
                    logdir: Path to a directory for logging.
     """
 
+    current_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+    log_dir = f"{config.logdir}/adaround_{current_time}"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+
     # Instantiate Data Pipeline for evaluation and training
     data_pipeline = ImageNetDataPipeline(config)
 
@@ -210,16 +215,19 @@ def adaround_example(config: argparse.Namespace):
 
     # Calculate FP32 accuracy
     accuracy = data_pipeline.evaluate(model, use_cuda=config.use_cuda)
-    logger.info("Original Model top-1 accuracy = %.2f", accuracy)
+    logger.info("Original Floating Point Model top-1 accuracy = %.2f", accuracy)
     logger.info("Applying Adaround")
 
     # Applying Adaround
     # Optimally rounds the parameters of the model
-    data_loader = ImageNetDataLoader(is_training=False, images_dir=config.dataset_dir,
+    data_loader = ImageNetDataLoader(is_training=False, 
+                                     images_dir=config.dataset_dir,
                                      image_size=image_net_config.dataset['image_size']).data_loader
-    accuracy = apply_adaround_and_find_quantized_accuracy(model=model, evaluator=data_pipeline.evaluate,
-                                                          data_loader=data_loader, use_cuda=config.use_cuda,
-                                                          logdir=config.logdir)
+    accuracy = apply_adaround_and_find_quantized_accuracy(model=model, 
+                                                          evaluator=data_pipeline.evaluate,
+                                                          data_loader=data_loader, 
+                                                          use_cuda=config.use_cuda,
+                                                          logdir=log_dir)
 
     logger.info("After applying Adaround, top-1 accuracy = %.2f", accuracy)
     logger.info("Adaround Complete")
@@ -228,8 +236,7 @@ def adaround_example(config: argparse.Namespace):
 if __name__ == '__main__':
     # default_logdir = os.path.join("benchmark_output", "adaround_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
 
-    parser = argparse.ArgumentParser(
-        description='Apply Adaround on pretrained ResNet18 model and evaluate on ImageNet dataset')
+    parser = argparse.ArgumentParser(description='Apply Adaround on pretrained ResNet18 model and evaluate on ImageNet dataset')
 
     parser.add_argument('--dataset_dir', 
                         type=str,
@@ -238,15 +245,13 @@ if __name__ == '__main__':
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
     parser.add_argument('--use_cuda', 
-                        # action='store_true',
                         default=True,
                         help='Add this flag to run the test on GPU.')
 
     parser.add_argument('--logdir', 
                         type=str,
-                        default=config_param.aimet_log_dir,
-                        help="Path to a directory for logging.\
-                              Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
+                        default=f"{config_param.aimet_log_dir}/adaround",
+                        help="Path to a directory for logging.Default value is 'benchmark_output")
 
     _config = parser.parse_args()
     
