@@ -52,7 +52,7 @@ import torch.utils.data as torch_data
 from spectrautils import logging_utils
 from spectrautils import print_utils
 from spectrautils.onnx_utils import visualize_torch_model_weights
-print_utils.print_colored_box("请在项目所在的 !根目录! 执行该脚本")
+print_utils.print_colored_box("请在项目所在的 <根目录> 执行该脚本")
 
 # imports for AIMET
 import aimet_common
@@ -70,12 +70,12 @@ os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
 
 
 logger_mangager = logging_utils.AsyncLoggerManager(
-    work_dir=config_param.aimet_log_dir, 
-    name_prefix="quant_cle_resnet18_torch_official")
+    work_dir=config_param.aimet_log_dir,
+    name_prefix="quant_cle_mobilenet_v2_torch_official")
 logger = logger_mangager.logger
 
 ###
-# This script utilizes AIMET to apply Cross Layer Equalization and Bias Correction on a resnet18
+# This script utilizes AIMET to apply Cross Layer Equalization and Bias Correction on a mobilenet_v2
 # pretrained model with the ImageNet data set. This is intended as a working example to show
 # how AIMET APIs can be invoked.
 
@@ -118,7 +118,8 @@ class ImageNetDataPipeline:
 
         # your code goes here instead of the example from below
 
-        evaluator = ImageNetEvaluator(self._config.dataset_dir, image_size=image_net_config.dataset['image_size'],
+        evaluator = ImageNetEvaluator(self._config.dataset_dir, 
+                                      image_size=image_net_config.dataset['image_size'],
                                       batch_size=image_net_config.evaluation['batch_size'],
                                       num_workers=image_net_config.evaluation['num_workers'])
 
@@ -205,7 +206,7 @@ def cle_bc_example(config: argparse.Namespace):
     """
     Example code that shows the following
     1. Instantiates Data Pipeline for evaluation
-    2. Loads the pretrained resnet18 Pytorch model
+    2. Loads the pretrained mobilenet_v2 Pytorch model
     3. Calculates Model accuracy
         3.1. Calculates floating point accuracy
         3.2. Calculates Quant Simulator accuracy
@@ -224,8 +225,9 @@ def cle_bc_example(config: argparse.Namespace):
     # Instantiate Data Pipeline for evaluation and training
     data_pipeline = ImageNetDataPipeline(config)
 
-    # Load the pretrained resnet18 model
-    model = models.resnet18(pretrained=True)
+    # Load the pretrained  model
+    model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
+
     if config.use_cuda:
         model.to(torch.device('cuda'))
     model = model.eval()
@@ -254,16 +256,18 @@ def cle_bc_example(config: argparse.Namespace):
     logger.info("Quantized (INT8) Model Top-1 Accuracy After Bias Correction = %.2f", accuracy)
 
     # Save the quantized model
-    torch.save(model, f"{config_param.aimet_log_dir}/resnet_model_cle_bc.pt")
+    torch.save(model, f"{config_param.aimet_log_dir}/mobilenet_v2_model_cle_bc.pt")
 
     logger.info("Cross Layer Equalization (CLE) and Bias Correction (BC) complete")
+    
+    logger.info("aimet cle bc log dir is : %s", config_param.aimet_log_dir)
 
 
 if __name__ == '__main__':
     default_logdir = os.path.join("benchmark_output", "CLE_BC" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
 
     parser = argparse.ArgumentParser(description='Apply Cross Layer Equalization and Bias Correction on pretrained '
-                                                 'ResNet18 model and evaluate on ImageNet dataset')
+                                                 'MobileNet_V2 model and evaluate on ImageNet dataset')
 
     parser.add_argument('--dataset_dir', 
                         type=str,

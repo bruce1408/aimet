@@ -1,4 +1,5 @@
 
+
 # # Automatic Mixed-Precision (AMP)
 # 
 # This notebook shows a working code example of how to use AIMET to perform Auto Mixed Precision (AMP). AMP is a technique where given a quantized accuracy target, AIMET finds bit-precision per-layer to meet that accuracy target while trying to optimize the model for inference speed.
@@ -52,6 +53,7 @@ from Examples.common import image_net_config
 from Examples.common import config_param
  
 DATASET_DIR = config_param.imagenet_dir
+log_dir = f"{config_param.aimet_log_dir}/mobilenet_v2_AMP"
 
 def get_val_dataloader(num_samples=None):
     root = os.path.join(DATASET_DIR, 'val')

@@ -201,7 +201,7 @@ class ImageNetDataLoader:
                 num_samples_per_class=num_samples_per_class)
         else:
             data_set = ImageFolder(
-                root=os.path.join(images_dir, 'val'), transform=self.val_transforms,
+                root=os.path.join(images_dir, 'val_mini'), transform=self.val_transforms,
                 num_samples_per_class=num_samples_per_class)
 
         self._data_loader = torch_data.DataLoader(
