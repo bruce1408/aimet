@@ -37,7 +37,7 @@ from Examples.common import config_param
 from torchvision import transforms, datasets
 os.environ["CUDA_VISIBLE_DEVICES"]=config_param.cuda_ids
 
-DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'         
+DATASET_DIR = config_param.imagenet_dir       
 
 val_transforms = transforms.Compose([
     transforms.CenterCrop(224),
@@ -45,7 +45,7 @@ val_transforms = transforms.Compose([
     transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
 ])
 
-imagenet_dataset = datasets.ImageFolder(root=os.path.join(DATASET_DIR, 'val'), transform=val_transforms)
+imagenet_dataset = datasets.ImageFolder(root=os.path.join(DATASET_DIR, 'val_mini'), transform=val_transforms)
 
 
 # ## 1. Define Constants and Helper functions
@@ -101,7 +101,7 @@ def eval_callback(model: torch.nn.Module, num_samples: Optional[int] = None) -> 
 # For this example, we are going to load a pretrained resnet18 model from torchvision. Similarly, you can load any pretrained PyTorch model instead.
 
 
-from torchvision.models import resnet18
+from torchvision import models
 
 model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 model.eval()
@@ -110,7 +110,7 @@ if torch.cuda.is_available():
     model.to(torch.device('cuda'))
 
 accuracy = eval_callback(model)
-print(f'- FP32 accuracy: {accuracy}')
+print(f'FP32 accuracy: {accuracy}')
 
 
 # ## 3. Run AutoQuant
@@ -150,7 +150,7 @@ auto_quant = AutoQuant(model,
 
 
 sim, initial_accuracy = auto_quant.run_inference()
-print(f"- Quantized Accuracy (before optimization): {initial_accuracy}")
+print(f"Quantized Accuracy (before optimization): {initial_accuracy}")
 
 
 # ### Set AdaRound Parameters (optional)
@@ -174,7 +174,7 @@ auto_quant.set_adaround_params(adaround_params)
 
 
 model, optimized_accuracy, encoding_path = auto_quant.optimize(allowed_accuracy_drop=0.01)
-print(f"- Quantized Accuracy (after optimization):  {optimized_accuracy}")
+print(f"Quantized Accuracy (after optimization):  {optimized_accuracy}")
 
 
 # ---

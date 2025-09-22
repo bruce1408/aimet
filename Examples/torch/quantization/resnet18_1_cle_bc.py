@@ -35,70 +35,65 @@
 #  @@-COPYRIGHT-END-@@
 #
 # =============================================================================
+
 """
-This file demonstrates the use of quantization using AIMET Adaround
-technique.
+This file demonstrates the use of quantization using AIMET Cross Layer Equalization (CLE)
+and Bias Correction (BC) technique.
 """
 
 import argparse
-import copy
 import logging
-import os,time
+import os
 from datetime import datetime
 from functools import partial
 from torchvision import models
-import torch,shutil
+import torch
 import torch.utils.data as torch_data
-from spectrautils import logging_utils, print_utils, time_utils
+from spectrautils import logging_utils
+from spectrautils import print_utils
 from spectrautils.onnx_utils import visualize_torch_model_weights
+print_utils.print_colored_box("请在项目所在的 <根目录> 执行该脚本")
 
+# imports for AIMET
 import aimet_common
-from aimet_common.defs import QuantScheme
-from aimet_torch.adaround.adaround_weight import Adaround, AdaroundParameters
-from aimet_torch.batch_norm_fold import fold_all_batch_norms
-from aimet_torch.quantsim import QuantizationSimModel
+from aimet_torch import bias_correction
+from aimet_torch.cross_layer_equalization import equalize_model
+from aimet_torch.quantsim import QuantParams, QuantizationSimModel
 
+# imports for data pipelines
+from Examples.common import config_param
 from Examples.common import image_net_config
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
 from Examples.torch.utils.image_net_evaluator import ImageNetEvaluator
-from Examples.common import config_param
 
 os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
 
-work_dir = f"{config_param.aimet_log_dir}/resnet18_adaround"
+work_dir = f"{config_param.aimet_log_dir}/resnet18_cle_bc_pc"
 os.makedirs(work_dir, exist_ok=True)
-
-logger_manager = logging_utils.AsyncLoggerManager(
-    work_dir = work_dir,
-    name_prefix="quant_adaround_resnet18_torch_official")
-
-logger = logger_manager.logger
 config_file_path = "/mnt/share_disk/bruce_trie/workspace/Quantizer-Tools/aimet/Examples/torch/quantization/quant_config.json"
-
-# logger = logging.getLogger('TorchAdaround')
-# formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
-# logging.basicConfig(format=formatter)
-
+logger_mangager = logging_utils.AsyncLoggerManager(work_dir=work_dir, name_prefix="quant_cle_resnet18_torch_official")
+logger = logger_mangager.logger
 
 ###
-# This script utilizes AIMET to apply Adaround on a resnet18 pretrained model with
-# the ImageNet data set. This is intended as a working example to show how AIMET
-# APIs can be invoked.
+# This script utilizes AIMET to apply Cross Layer Equalization and Bias Correction on a resnet18
+# pretrained model with the ImageNet data set. This is intended as a working example to show
+# how AIMET APIs can be invoked.
 
 # Scenario parameters:
 #    - AIMET quantization accuracy using simulation model
 #       - Quant Scheme: 'tf_enhanced'
 #       - rounding_mode: 'nearest'
 #       - default_output_bw: 8, default_param_bw: 8
-#       - Encoding computation with or without encodings file
 #       - Encoding computation using 5 batches of data
-#    - AIMET Adaround
-#       - num of batches for adarounding: 5
-#       - bitwidth for quantizing layer parameters: 4
+#    - AIMET Bias Correction
 #       - Quant Scheme: 'tf_enhanced'
-#       - Remaining Parameters: default
+#       - rounding_mode: 'nearest'
+#       - num_quant_samples: 16
+#       - num_bias_correct_samples: 16
+#       - ops_to_ignore: None
 #    - Input shape: [1, 3, 224, 224]
 ###
+
 
 class ImageNetDataPipeline:
     """
@@ -123,36 +118,29 @@ class ImageNetDataPipeline:
 
         # your code goes here instead of the example from below
 
-        evaluator = ImageNetEvaluator(self._config.dataset_dir, image_size=image_net_config.dataset['image_size'],
+        evaluator = ImageNetEvaluator(self._config.dataset_dir, 
+                                      image_size=image_net_config.dataset['image_size'],
                                       batch_size=image_net_config.evaluation['batch_size'],
                                       num_workers=image_net_config.evaluation['num_workers'])
 
         return evaluator.evaluate(model, iterations, use_cuda)
 
 
-def apply_adaround_and_find_quantized_accuracy(model: torch.nn.Module, evaluator: aimet_common.defs.EvalFunction,
-                                               data_loader: torch_data.DataLoader, use_cuda: bool = False,
-                                               logdir: str = '') -> float:
+def calculate_quantsim_accuracy(model: torch.nn.Module, evaluator: aimet_common.defs.EvalFunction,
+                                use_cuda: bool = False) -> float:
     """
-    Quantizes the model using AIMET's adaround feature, and saves the model.
+    Calculates quantized model accuracy (INT8) using AIMET QuantizationSim
 
-    :param model: The loaded model
-    :param evaluator: The Eval function to use for evaluation
-    :param data_loader: The dataloader to be passed into the AdaroundParameters api
-    :param use_cuda: The cuda device.
-    :param logdir: Path to a directory for logging.
-    :return: Accuracy of model on this quantsim
+    :param model: the loaded model
+    :param evaluator: the Eval function to use for evaluation
+    :param use_cuda: True, if model is placed on GPU
+    :return: quantized accuracy of model
     """
-
-    bn_folded_model = copy.deepcopy(model)
-    _ = fold_all_batch_norms(bn_folded_model, input_shapes=(1, 3, 224, 224))
-
     input_shape = (1, image_net_config.dataset['image_channels'],
                    image_net_config.dataset['image_width'],
                    image_net_config.dataset['image_height'],)
     if use_cuda:
         dummy_input = torch.rand(input_shape).cuda()
-
     else:
         dummy_input = torch.rand(input_shape)
 
@@ -160,48 +148,78 @@ def apply_adaround_and_find_quantized_accuracy(model: torch.nn.Module, evaluator
     # Only 5 batches are used here to speed up the process, also the
     # number of images in these 5 batches should be sufficient for
     # compute encodings
-    iterations = 5
+    iterations = 10
+    # config_file_path = "/mnt/share_disk/bruce_trie/workspace/Quantizer-Tools/aimet/Examples/torch/quantization/quant_config.json"
 
-    params = AdaroundParameters(data_loader=data_loader, num_batches=5)
-    ada_model = Adaround.apply_adaround(bn_folded_model, 
-                                        dummy_input, params,
-                                        path=logdir,
-                                        filename_prefix='adaround', 
-                                        default_param_bw=8,
-                                        default_quant_scheme=QuantScheme.post_training_tf_enhanced,
-                                        default_config_file=config_file_path)
-
-    quantsim = QuantizationSimModel(model=ada_model, dummy_input=dummy_input,
-                                    quant_scheme=QuantScheme.post_training_tf_enhanced,
-                                    rounding_mode='nearest', 
-                                    default_output_bw=8, 
-                                    default_param_bw=8,
+    quantsim = QuantizationSimModel(model=model, 
+                                    quant_scheme='tf_enhanced',
+                                    dummy_input=dummy_input, 
                                     config_file=config_file_path,
+                                    rounding_mode='nearest',
+                                    default_output_bw=8, 
+                                    default_param_bw=8, 
                                     in_place=False)
 
-    # Set and freeze parameter encodings. These encodings are associated with the Adarounded parameters.
-    # This will make sure compute_encodings() doesn't alter the parameter encodings.
-    quantsim.set_and_freeze_param_encodings(encoding_path=os.path.join(logdir, 'adaround.encodings'))
     quantsim.compute_encodings(forward_pass_callback=partial(evaluator, use_cuda=use_cuda),
                                forward_pass_callback_args=iterations)
-    
-    quantsim.export(path=logdir, filename_prefix='adaround_resnet', dummy_input=dummy_input.cpu())
+
     accuracy = evaluator(quantsim.model, use_cuda=use_cuda)
 
     return accuracy
 
 
-def adaround_example(config: argparse.Namespace):
+def apply_cross_layer_equalization(model: torch.nn.Module, input_shape: tuple):
     """
+    Applying CLE on the model inplace consists of:
+        - Batch Norm Folding
+        - Converts any ReLU6 layers to ReLU layers
+        - Cross Layer Scaling
+        - High Bias Fold
+
+    :param model: the loaded model
+    :param input_shape: the shape of the input to the model
+    :return:
+    """
+    equalize_model(model, input_shape)
+
+
+def apply_bias_correction(model: torch.nn.Module, data_loader: torch_data.DataLoader):
+    """
+    Applies Bias-Correction on the model.
+    :param model: The model to quantize
+    :param evaluator: Evaluator used during quantization
+    :param dataloader: DataLoader used during quantization
+    :param logdir: Log directory used for storing log files
+    :return: None
+    """
+    # Rounding mode can be 'nearest' or 'stochastic'
+    rounding_mode = 'nearest'
+
+    # Number of samples used during quantization
+    num_quant_samples = 16
+
+    # Number of samples used for bias correction
+    num_bias_correct_samples = 16
+    
+    # config_file_path = "/mnt/share_disk/bruce_trie/workspace/Quantizer-Tools/aimet/Examples/torch/quantization/quant_config.json"
+    params = QuantParams(weight_bw=8, act_bw=8, round_mode=rounding_mode, quant_scheme='tf_enhanced', config_file=config_file_path)
+
+    # Perform Bias Correction
+    bias_correction.correct_bias(model.to(device="cuda"), params, num_quant_samples=num_quant_samples,
+                                 data_loader=data_loader, num_bias_correct_samples=num_bias_correct_samples)
+
+
+def cle_bc_example(config: argparse.Namespace):
+    """
+    Example code that shows the following
     1. Instantiates Data Pipeline for evaluation
     2. Loads the pretrained resnet18 Pytorch model
     3. Calculates Model accuracy
         3.1. Calculates floating point accuracy
         3.2. Calculates Quant Simulator accuracy
-    4. Applies AIMET Adaround and calculates QuantSim accuracy
-        4.1. Applies AIMET Adaround
-        4.2. Calculates Adaround applied model Quant Simulator accuracy
-        4.3. Exports Adaround applied model so it is ready to be run on-target
+    4. Applies AIMET CLE and BC
+        4.1. Applies AIMET CLE and calculates QuantSim accuracy
+        4.2. Applies AIMET BC and calculates QuantSim accuracy
 
     :param config: This argparse.Namespace config expects following parameters:
                    tfrecord_dir: Path to a directory containing ImageNet TFRecords.
@@ -211,43 +229,55 @@ def adaround_example(config: argparse.Namespace):
                    logdir: Path to a directory for logging.
     """
 
-    current_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-    log_dir = f"{config.logdir}/adaround_{current_time}"
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir, exist_ok=True)
-
     # Instantiate Data Pipeline for evaluation and training
     data_pipeline = ImageNetDataPipeline(config)
-
+    
     # Load the pretrained resnet18 model
     model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
-    
+
     if config.use_cuda:
         model.to(torch.device('cuda'))
-    model = model.eval()
-
+    model.eval()
+    
     # Calculate FP32 accuracy
     accuracy = data_pipeline.evaluate(model, use_cuda=config.use_cuda)
-    logger.info("Original Floating Point Model top-1 accuracy = %.2f", accuracy)
-    logger.info("Applying Adaround")
+    logger.info("Original Model Top-1 accuracy = %.2f", accuracy)
 
-    # Applying Adaround
-    # Optimally rounds the parameters of the model
-    data_loader = ImageNetDataLoader(is_training=False, 
-                                     images_dir=config.dataset_dir,
-                                     image_size=image_net_config.dataset['image_size']).data_loader
-    accuracy = apply_adaround_and_find_quantized_accuracy(model=model, 
-                                                          evaluator=data_pipeline.evaluate,
-                                                          data_loader=data_loader, 
-                                                          use_cuda=config.use_cuda,
-                                                          logdir=log_dir)
+    # Applying cross-layer equalization (CLE)
+    # Note that this API will equalize the model in-place
+    apply_cross_layer_equalization(model=model, input_shape=(1, 3, 224, 224))
 
-    logger.info("After applying Adaround, top-1 accuracy = %.2f", accuracy)
-    logger.info("Adaround Complete")
+    # Calculate quantized (INT8) accuracy after CLE
+    accuracy = calculate_quantsim_accuracy(model=model, evaluator=data_pipeline.evaluate, use_cuda=config.use_cuda)
+    logger.info("Quantized (INT8) Model Top-1 Accuracy After CLE = %.2f", accuracy)
+
+    # Applying Bias Correction
+    # Bias Correction needs representative data samples (a small subset of either the training or validation data)
+    data_loader = ImageNetDataLoader(
+        is_training=False, 
+        images_dir=_config.dataset_dir,
+        image_size=image_net_config.dataset['image_size']).data_loader
+    
+    # Note that this API will bias-correct the model in-place
+    apply_bias_correction(model=model, data_loader=data_loader)
+
+    # Calculating accuracy on Quant Simulator
+    accuracy = calculate_quantsim_accuracy(model=model, evaluator=data_pipeline.evaluate, use_cuda=config.use_cuda)
+    logger.info("Quantized (INT8) Model Top-1 Accuracy After Bias Correction = %.2f", accuracy)
+
+    # Save the quantized model
+    torch.save(model, f"{work_dir}/resnet_model_cle_bc.pt")
+
+    logger.info("Cross Layer Equalization (CLE) and Bias Correction (BC) complete")
+    
+    logger.info("aimet cle bc log dir is : %s", work_dir)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Apply Adaround on pretrained ResNet18 model and evaluate on ImageNet dataset')
+    default_logdir = os.path.join("benchmark_output", "CLE_BC" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
+
+    parser = argparse.ArgumentParser(description='Apply Cross Layer Equalization and Bias Correction on pretrained '
+                                                 'ResNet18 model and evaluate on ImageNet dataset')
 
     parser.add_argument('--dataset_dir', 
                         type=str,
@@ -255,22 +285,21 @@ if __name__ == '__main__':
                         help="Path to a directory containing ImageNet dataset.\n\
                               This folder should conatin at least 2 subfolders:\n\
                               'train': for training dataset and 'val': for validation dataset")
-    
+
     parser.add_argument('--use_cuda', 
+                        # action='store_true',
                         default=True,
                         help='Add this flag to run the test on GPU.')
 
-    parser.add_argument('--logdir', 
-                        type=str,
-                        default=f"{config_param.aimet_log_dir}/resnet18_adaround",
-                        help="Path to a directory for logging.Default value is 'benchmark_output")
+    parser.add_argument('--logdir', type=str,
+                        default=default_logdir,
+                        help="Path to a directory for logging. "
+                             "Default value is 'benchmark_output/weight_svd_<Y-m-d-H-M-S>'")
 
     _config = parser.parse_args()
-    
-    
 
     if _config.use_cuda and not torch.cuda.is_available():
         logger.error('use_cuda is selected but no cuda device found.')
         raise RuntimeError("Found no CUDA Device while use_cuda is selected")
 
-    adaround_example(_config)
+    cle_bc_example(_config)
