@@ -234,7 +234,7 @@ def cle_bc_example(config: argparse.Namespace):
     
     # Load the pretrained resnet18 model
     model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
-    model.load_state_dict(torch.load("/mnt/share_disk/bruce_trie/workspace/Quantizer-Tools/_outputs/models/resnet18-f37072fd.pth"))
+    # model.load_state_dict(torch.load("/mnt/share_disk/bruce_trie/workspace/Quantizer-Tools/_outputs/models/resnet18-f37072fd.pth"))
     
     
     if config.use_cuda:
@@ -245,7 +245,6 @@ def cle_bc_example(config: argparse.Namespace):
     accuracy = data_pipeline.evaluate(model, use_cuda=config.use_cuda)
     logger.info("Original Model Top-1 accuracy = %.2f", accuracy)
 
-    return 
     # Applying cross-layer equalization (CLE)
     # Note that this API will equalize the model in-place
     apply_cross_layer_equalization(model=model, input_shape=(1, 3, 224, 224))
