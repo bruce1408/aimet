@@ -129,7 +129,6 @@ class ImageNetEvaluator:
         acc_top1 /= iterations
         acc_top5 /= iterations
 
-        logger.info('Avg accuracy Top 1: %f Avg accuracy Top 5: %f on validation Dataset',
-                    acc_top1, acc_top5)
-
+        logger.info('Avg accuracy Top 1: %f Avg accuracy Top 5: %f on validation Dataset', acc_top1, acc_top5)
+        
         return acc_top1
