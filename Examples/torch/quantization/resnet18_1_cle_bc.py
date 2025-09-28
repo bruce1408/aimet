@@ -70,7 +70,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
 
 work_dir = f"{config_param.aimet_log_dir}/resnet18_cle_bc_pc"
 os.makedirs(work_dir, exist_ok=True)
-config_file_path = "/mnt/share_disk/bruce_trie/workspace/Quantizer-Tools/aimet/Examples/torch/quantization/quant_config.json"
+config_file_path = config_param.quant_config_path
 logger_mangager = logging_utils.AsyncLoggerManager(work_dir=work_dir, name_prefix="quant_cle_resnet18_torch_official")
 logger = logger_mangager.logger
 
@@ -149,7 +149,6 @@ def calculate_quantsim_accuracy(model: torch.nn.Module, evaluator: aimet_common.
     # number of images in these 5 batches should be sufficient for
     # compute encodings
     iterations = 10
-    # config_file_path = "/mnt/share_disk/bruce_trie/workspace/Quantizer-Tools/aimet/Examples/torch/quantization/quant_config.json"
 
     quantsim = QuantizationSimModel(model=model, 
                                     quant_scheme='tf_enhanced',
@@ -201,8 +200,13 @@ def apply_bias_correction(model: torch.nn.Module, data_loader: torch_data.DataLo
     # Number of samples used for bias correction
     num_bias_correct_samples = 16
     
-    # config_file_path = "/mnt/share_disk/bruce_trie/workspace/Quantizer-Tools/aimet/Examples/torch/quantization/quant_config.json"
-    params = QuantParams(weight_bw=8, act_bw=8, round_mode=rounding_mode, quant_scheme='tf_enhanced', config_file=config_file_path)
+    params = QuantParams(
+        weight_bw=8, 
+        act_bw=8, 
+        round_mode=rounding_mode, 
+        quant_scheme='tf_enhanced', 
+        config_file=config_file_path
+    )
 
     # Perform Bias Correction
     bias_correction.correct_bias(model.to(device="cuda"), params, num_quant_samples=num_quant_samples,

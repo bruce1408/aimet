@@ -37,3 +37,4 @@ packaging/setup_cfg.py
 **output_log/
 **examples_pro/
 **lightning_logs/
+config_param.py

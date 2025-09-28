@@ -73,7 +73,7 @@ logger_manager = logging_utils.AsyncLoggerManager(
     name_prefix="quant_adaround_resnet18_torch_official")
 
 logger = logger_manager.logger
-config_file_path = "/mnt/share_disk/bruce_trie/workspace/Quantizer-Tools/aimet/Examples/torch/quantization/quant_config.json"
+config_file_path = config_param.quant_config_path
 
 # logger = logging.getLogger('TorchAdaround')
 # formatter = logging.Formatter('%(asctime)s : %(name)s - %(levelname)s - %(message)s')
@@ -169,15 +169,17 @@ def apply_adaround_and_find_quantized_accuracy(model: torch.nn.Module, evaluator
                                         filename_prefix='adaround', 
                                         default_param_bw=8,
                                         default_quant_scheme=QuantScheme.post_training_tf_enhanced,
-                                        default_config_file=config_file_path)
+                                        default_config_file=config_file_path
+                                    )
 
     quantsim = QuantizationSimModel(model=ada_model, dummy_input=dummy_input,
                                     quant_scheme=QuantScheme.post_training_tf_enhanced,
                                     rounding_mode='nearest', 
                                     default_output_bw=8, 
                                     default_param_bw=8,
+                                    in_place=False,
                                     config_file=config_file_path,
-                                    in_place=False)
+                                )
 
     # Set and freeze parameter encodings. These encodings are associated with the Adarounded parameters.
     # This will make sure compute_encodings() doesn't alter the parameter encodings.
