@@ -209,8 +209,13 @@ def apply_bias_correction(model: torch.nn.Module, data_loader: torch_data.DataLo
     )
 
     # Perform Bias Correction
-    bias_correction.correct_bias(model.to(device="cuda"), params, num_quant_samples=num_quant_samples,
-                                 data_loader=data_loader, num_bias_correct_samples=num_bias_correct_samples)
+    bias_correction.correct_bias(
+        model.to(device="cuda"), 
+        params, 
+        num_quant_samples=num_quant_samples,
+        data_loader=data_loader, 
+        num_bias_correct_samples=num_bias_correct_samples
+    )
 
 
 def cle_bc_example(config: argparse.Namespace):
