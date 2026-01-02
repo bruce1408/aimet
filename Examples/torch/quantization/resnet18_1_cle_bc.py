@@ -52,7 +52,7 @@ import torch.utils.data as torch_data
 from spectrautils import logging_utils
 from spectrautils import print_utils
 from spectrautils.onnx_utils import visualize_torch_model_weights
-print_utils.print_colored_box("请在项目所在的 <根目录> 执行该脚本")
+print_utils.print_colored_box("请在项目aimet 所在的 <根目录> 执行该脚本")
 
 # imports for AIMET
 import aimet_common
