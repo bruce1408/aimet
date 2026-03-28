@@ -30,7 +30,6 @@
 
 
 # DATASET_DIR = '/path/to/dataset/'         # Please replace this with a real directory
-DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'         
 
 
 # ---
@@ -45,8 +44,11 @@ DATASET_DIR = '/mnt/share_disk/bruce_trie/outputs/imagenet_dataset'
 import torch
 import onnxruntime as ort
 from Examples.common import image_net_config
+from Examples.common import config_param
 from Examples.onnx.utils.image_net_evaluator import ImageNetEvaluator
 from Examples.torch.utils.image_net_data_loader import ImageNetDataLoader
+
+DATASET_DIR = config_param.imagenet_dir        
 
 class ImageNetDataPipeline:
 
@@ -89,7 +91,7 @@ import onnx
 input_shape = (1, 3, 224, 224)    # Shape for each ImageNet sample is (3 channels) x (224 height) x (224 width)
 dummy_input = torch.randn(input_shape)
 # filename = "./resnet18.onnx"
-filename = "/mnt/share_disk/bruce_trie/workspace/logs_aimet/resnet18.onnx"
+filename = config_param.onnx_resnet18_path
 
 # Load a pretrained ResNet-18 model in torch
 pt_model = resnet18(pretrained=True)

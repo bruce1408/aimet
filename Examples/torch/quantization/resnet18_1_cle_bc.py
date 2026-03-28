@@ -71,7 +71,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = config_param.cuda_ids
 work_dir = f"{config_param.aimet_log_dir}/resnet18_cle_bc_pc"
 os.makedirs(work_dir, exist_ok=True)
 config_file_path = config_param.quant_config_path
-logger_mangager = logging_utils.AsyncLoggerManager(work_dir=work_dir, name_prefix="quant_cle_resnet18_torch_official")
+logger_mangager = logging_utils.AsyncLoggerManager(work_dir=work_dir, 
+                                                   name_prefix="quant_cle_resnet18_torch_official")
 logger = logger_mangager.logger
 
 ###
